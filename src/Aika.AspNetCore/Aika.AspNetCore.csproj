@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Aika.InMemoryHistorian\Aika.InMemoryHistorian.csproj" />
     <ProjectReference Include="..\Aika\Aika.csproj" />
   </ItemGroup>
 
