@@ -14,8 +14,13 @@ namespace Aika {
 
         public string Description { get; }
 
+        public bool IsNativeFuction { get; }
 
-        public DataQueryFunction(string name, string description) {
+
+        public DataQueryFunction(string name, string description) : this(name, description, true) { }
+
+
+        private DataQueryFunction(string name, string description, bool isNativeFunction) {
             if (String.IsNullOrWhiteSpace(name)) {
                 throw new ArgumentException("You must specify a data function name.", nameof(name));
             }
@@ -23,37 +28,44 @@ namespace Aika {
             Name = name.Trim();
             _hashCode = Name.GetHashCode();
             Description = description;
+            IsNativeFuction = isNativeFunction;
         }
 
-        /// <summary>
-        /// Raw, unaggregated data.
-        /// </summary>
-        public static readonly DataQueryFunction Raw = new DataQueryFunction("RAW", "Returns raw, unprocessed data");
 
         /// <summary>
         /// Interpolated data.
         /// </summary>
-        public static readonly DataQueryFunction Interpolated = new DataQueryFunction("INTERP", "Calculates interpolated values at a given sample interval");
+        public const string Interpolated = "INTERP";
 
         /// <summary>
         /// Visualization-friendly data.
         /// </summary>
-        public static readonly DataQueryFunction Plot = new DataQueryFunction("PLOT", "Visualization-friendly data");
+        public const string Plot = "PLOT";
 
+        /// <summary>
+        /// Average value, calculated over a given sample interval.
+        /// </summary>
+        public const string Average = "AVG";
 
-        public static readonly DataQueryFunction Average = new DataQueryFunction("AVG", "Calculates the average value of a tag at a given sample interval");
+        /// <summary>
+        /// Minimum value, calculated over a given sample interval.
+        /// </summary>
+        public const string Minimum = "MIN";
 
-        public static readonly DataQueryFunction Minimum = new DataQueryFunction("MIN", "Calculates the minimum value of a tag at a given sample interval");
+        /// <summary>
+        /// Maximum value, calculated over a given sample interval.
+        /// </summary>
+        public const string Maximum = "MAX";
 
-        public static readonly DataQueryFunction Maximum = new DataQueryFunction("MAX", "Calculates the maximum value of a tag at a given sample interval");
-
-        public static readonly IEnumerable<DataQueryFunction> DefaultFunctions = new[] {
-            Raw,
-            Interpolated,
-            Plot,
-            Average,
-            Minimum,
-            Maximum
+        /// <summary>
+        /// Default data function definitions.
+        /// </summary>
+        internal static readonly IEnumerable<DataQueryFunction> DefaultFunctions = new[] {
+            new DataQueryFunction(Interpolated, "Calculates interpolated values at a given sample interval", false),
+            new DataQueryFunction(Plot, "Visualization-friendly data", false),
+            new DataQueryFunction(Average, "Calculates the average value of a tag at a given sample interval", false),
+            new DataQueryFunction(Minimum, "Calculates the minimum value of a tag at a given sample interval", false),
+            new DataQueryFunction(Maximum, "Calculates the maximum value of a tag at a given sample interval", false)
         };
 
         public override int GetHashCode() {

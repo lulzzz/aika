@@ -291,7 +291,7 @@ namespace Aika.Aggregation {
                 return Interval(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
 
-            return GetAggregatedData(tag, utcStartTime, utcEndTime, sampleInterval, rawData, DataQueryFunction.Average.Name, CalculateAverage);
+            return GetAggregatedData(tag, utcStartTime, utcEndTime, sampleInterval, rawData, DataQueryFunction.Average, CalculateAverage);
         }
 
 
@@ -313,7 +313,7 @@ namespace Aika.Aggregation {
                 return Interval(tag, utcStartTime, utcEndTime, pointCount, rawData);
             }
 
-            return GetAggregatedData(tag, utcStartTime, utcEndTime, pointCount, rawData, DataQueryFunction.Average.Name, CalculateAverage);
+            return GetAggregatedData(tag, utcStartTime, utcEndTime, pointCount, rawData, DataQueryFunction.Average, CalculateAverage);
         }
 
         #endregion
@@ -360,7 +360,7 @@ namespace Aika.Aggregation {
                 return Interval(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
 
-            return GetAggregatedData(tag, utcStartTime, utcEndTime, sampleInterval, rawData, DataQueryFunction.Minimum.Name, CalculateMinimum);
+            return GetAggregatedData(tag, utcStartTime, utcEndTime, sampleInterval, rawData, DataQueryFunction.Minimum, CalculateMinimum);
         }
 
 
@@ -383,7 +383,7 @@ namespace Aika.Aggregation {
                 return Interval(tag, utcStartTime, utcEndTime, pointCount, rawData);
             }
 
-            return GetAggregatedData(tag, utcStartTime, utcEndTime, pointCount, rawData, DataQueryFunction.Minimum.Name, CalculateMinimum);
+            return GetAggregatedData(tag, utcStartTime, utcEndTime, pointCount, rawData, DataQueryFunction.Minimum, CalculateMinimum);
         }
 
         #endregion
@@ -430,7 +430,7 @@ namespace Aika.Aggregation {
                 return Interval(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
 
-            return GetAggregatedData(tag, utcStartTime, utcEndTime, sampleInterval, rawData, DataQueryFunction.Maximum.Name, CalculateMaximum);
+            return GetAggregatedData(tag, utcStartTime, utcEndTime, sampleInterval, rawData, DataQueryFunction.Maximum, CalculateMaximum);
         }
 
 
@@ -453,7 +453,7 @@ namespace Aika.Aggregation {
                 return Interval(tag, utcStartTime, utcEndTime, pointCount, rawData);
             }
 
-            return GetAggregatedData(tag, utcStartTime, utcEndTime, pointCount, rawData, DataQueryFunction.Maximum.Name, CalculateMaximum);
+            return GetAggregatedData(tag, utcStartTime, utcEndTime, pointCount, rawData, DataQueryFunction.Maximum, CalculateMaximum);
         }
 
         #endregion
@@ -524,7 +524,7 @@ namespace Aika.Aggregation {
             if (_log?.IsEnabled(LogLevel.Debug) ?? false) {
                 _log.LogDebug($"[{DataQueryFunction.Interpolated}] Performing data aggregation: Start Time = {utcStartTime:yyyy-MM-ddTHH:mm:ss.fffZ}, End Time = {utcEndTime:yyyy-MM-ddTHH:mm:ss.fffZ}, Sample Interval = {sampleInterval}, Raw Data Sample Count = {rawSamples.Length}");
             }
-            CheckRawDataTimeRange(DataQueryFunction.Interpolated.Name, rawSamples, utcStartTime, utcEndTime);
+            CheckRawDataTimeRange(DataQueryFunction.Interpolated, rawSamples, utcStartTime, utcEndTime);
 
             // Set the initial list capacity based on the time range and sample interval.
             var capacity = (int) ((utcEndTime - utcStartTime).TotalMilliseconds / sampleInterval.TotalMilliseconds);
@@ -766,7 +766,7 @@ namespace Aika.Aggregation {
             if (_log?.IsEnabled(LogLevel.Debug) ?? false) {
                 _log.LogDebug($"[{DataQueryFunction.Plot}] Performing data aggregation: Start Time = {utcStartTime:yyyy-MM-ddTHH:mm:ss.fffZ}, End Time = {utcEndTime:yyyy-MM-ddTHH:mm:ss.fffZ}, Sample Interval = {sampleInterval}, Raw Data Sample Count = {rawSamples.Length}");
             }
-            CheckRawDataTimeRange(DataQueryFunction.Plot.Name, rawSamples, utcStartTime, utcEndTime);
+            CheckRawDataTimeRange(DataQueryFunction.Plot, rawSamples, utcStartTime, utcEndTime);
 
             // Set the initial list capacity based on the time range and sample interval.
             var result = new List<TagValue>((int) ((utcEndTime - utcStartTime).TotalMilliseconds / sampleInterval.TotalMilliseconds));
@@ -945,28 +945,24 @@ namespace Aika.Aggregation {
             }
 
             // AVG
-            if (DataQueryFunction.Average.Name.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
+            if (DataQueryFunction.Average.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
                 return Average(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
             // INTERP
-            if (DataQueryFunction.Interpolated.Name.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
+            if (DataQueryFunction.Interpolated.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
                 return Interpolate(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
             // MAX
-            if (DataQueryFunction.Maximum.Name.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
+            if (DataQueryFunction.Maximum.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
                 return Maximum(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
             // MIN
-            if (DataQueryFunction.Minimum.Name.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
+            if (DataQueryFunction.Minimum.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
                 return Minimum(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
             // PLOT
-            if (DataQueryFunction.Plot.Name.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
+            if (DataQueryFunction.Plot.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
                 return Plot(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
-            }
-            // RAW
-            if (DataQueryFunction.Raw.Name.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
-                return rawData?.Where(x => x.UtcSampleTime >= utcStartTime).Where(x => x.UtcSampleTime <= utcEndTime).ToArray();
             }
 
             return new TagValue[0];
@@ -984,9 +980,6 @@ namespace Aika.Aggregation {
         /// <param name="rawData"></param>
         /// <returns></returns>
         public IEnumerable<TagValue> Aggregate(TagDefinition tag, string aggregateName, DateTime utcStartTime, DateTime utcEndTime, int pointCount, IEnumerable<TagValue> rawData) {
-            if (DataQueryFunction.Raw.Name.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
-                return rawData?.Where(x => x.UtcSampleTime >= utcStartTime).Where(x => x.UtcSampleTime <= utcEndTime).Take(pointCount).ToArray();
-            }
             return Aggregate(tag, aggregateName, utcStartTime, utcEndTime, GetSampleInterval(utcStartTime, utcEndTime, pointCount), rawData);
         }
 

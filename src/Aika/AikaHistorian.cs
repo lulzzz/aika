@@ -198,16 +198,126 @@ namespace Aika {
         }
 
 
+        /// <summary>
+        /// Gets the aggregate functions supported natively by the underlying historian.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The supported data query aggregate functions.  All functions in <see cref="DataQueryFunction.DefaultFunctions"/> 
+        /// will always be included, as <see cref="AikaHistorian"/> provides a default implementation 
+        /// for these functions if they are not supported natively by the underlying <see cref="IHistorian"/>.
+        /// </returns>
+        private async Task<IEnumerable<DataQueryFunction>> GetAvailableNativeDataQueryFunctions(CancellationToken cancellationToken) {
+            return await RunWithImmediateCancellation(_dataReader.GetAvailableDataQueryFunctions(cancellationToken), cancellationToken).ConfigureAwait(false);
+        }
+
+
+        /// <summary>
+        /// Gets the aggregate functions supported both natively by the underlying historian and 
+        /// implicitly by the <see cref="AikaHistorian"/>.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The supported data query aggregate functions.  All functions in <see cref="DataQueryFunction.DefaultFunctions"/> 
+        /// will always be included, as <see cref="AikaHistorian"/> provides a default implementation 
+        /// for these functions if they are not supported natively by the underlying <see cref="IHistorian"/>.
+        /// </returns>
         public async Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
             if (_dataReader == null) {
                 throw new NotSupportedException();
             }
 
-            return await _dataReader.GetAvailableDataQueryFunctions(cancellationToken).ConfigureAwait(false);
+            var nativeFunctions = await GetAvailableNativeDataQueryFunctions(cancellationToken).ConfigureAwait(false);
+            return nativeFunctions.Concat(DataQueryFunction.DefaultFunctions).Distinct().ToArray();
         }
 
 
-        private async Task<IDictionary<string, TagValueCollection>> ReadHistoricalData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Performs a request for raw, unprocessed tag data.
+        /// </summary>
+        /// <param name="identity"></param>
+        /// <param name="tagNames"></param>
+        /// <param name="utcStartTime"></param>
+        /// <param name="utcEndTime"></param>
+        /// <param name="pointCount"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsIdentity identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+            if (_dataReader == null) {
+                throw new NotSupportedException();
+            }
+
+            if (identity == null) {
+                throw new ArgumentNullException(nameof(identity));
+            }
+
+            if (!IsInRole(identity, Roles.ReadTagData, true)) {
+                throw new SecurityException("Not authorized to read tag data.");
+            }
+
+            if (tagNames == null) {
+                throw new ArgumentNullException(nameof(tagNames));
+            }
+
+            var distinctTagNames = tagNames.Where(x => !String.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (distinctTagNames.Length == 0) {
+                throw new ArgumentException("You must specify at least one non-empty tag name.", nameof(tagNames));
+            }
+
+            var authResult = await RunWithImmediateCancellation(_dataReader.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+
+            var authorisedTagNames = authResult.Where(x => x.Value).Select(x => x.Key).ToArray();
+            var unauthorisedTagNames = authResult.Where(x => !x.Value).Select(x => x.Key).ToArray();
+
+            IDictionary<string, TagValueCollection> result;
+
+            if (authorisedTagNames.Length == 0) {
+                result = new Dictionary<string, TagValueCollection>();
+            }
+            else {
+                result = await RunWithImmediateCancellation(_dataReader.ReadRawData(identity, authorisedTagNames, utcStartTime, utcEndTime, pointCount, cancellationToken), cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var tagName in unauthorisedTagNames) {
+                result[tagName] = new TagValueCollection() {
+                    VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
+                    Values = new[] {
+                        TagValue.CreateUnauthorizedTagValue(utcStartTime)
+                    }
+                };
+            }
+
+            return result;
+        }
+
+
+        /// <summary>
+        /// Performs a historical data query.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagNames">The tags to query.  These will be separated into authorized and unauthorized sets by the method.</param>
+        /// <param name="dataFunction">
+        ///   The aggregate data function to use.  This must be either supported natively by the 
+        ///   underlying <see cref="IHistorian"/>, or implicitly by the <see cref="AikaHistorian"/>.  
+        ///   See <see cref="DataQueryFunction.DefaultFunctions"/> for implicitly supported functions.
+        /// </param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="sampleInterval">
+        ///   The sample interval to use for aggregation.  This is only used if <paramref name="pointCount"/> 
+        ///   is <see langword="null"/>.
+        /// </param>
+        /// <param name="pointCount">
+        ///   The sample count to use.  For <see cref="DataQueryFunction.Raw"/> requests, this is the maximum 
+        ///   number of samples to return per tag.  Note that the underlying <see cref="IHistorian"/> itself 
+        ///   may place additional constraints on the maximum value of this parameter.  Specify <see langword="null"/>
+        ///   to use the <paramref name="sampleInterval"/> instead.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The results of the query, indexed by tag name.
+        /// </returns>
+        private async Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -236,18 +346,18 @@ namespace Aika {
                 result = new Dictionary<string, TagValueCollection>();
             }
             else {
-                var supportedDataFunctions = await _dataReader.GetAvailableDataQueryFunctions(cancellationToken).ConfigureAwait(false);
+                var supportedDataFunctions = await GetAvailableNativeDataQueryFunctions(cancellationToken).ConfigureAwait(false);
                 var func = supportedDataFunctions?.FirstOrDefault(x => String.Equals(dataFunction, x.Name, StringComparison.OrdinalIgnoreCase));
 
                 Task<IDictionary<string, TagValueCollection>> query;
 
-                if (DataQueryFunction.Raw.Name.Equals(dataFunction, StringComparison.OrdinalIgnoreCase) || func != null) {
-                    // For RAW queries, or for functons that are supported by the underlying 
-                    // historian, delegate the request to the underlying historian.
+                if (func != null) {
+                    // For functons that are supported by the underlying historian, delegate the 
+                    // request to the there.
 
                     query = pointCount.HasValue
-                        ? _dataReader.ReadHistoricalData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
-                        : _dataReader.ReadHistoricalData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
+                        ? _dataReader.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
+                        : _dataReader.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
                 }
                 else if (Aggregation.AggregationUtility.IsSupportedFunction(dataFunction)) {
                     // For functions that are not supported by the underlying historian but are 
@@ -267,11 +377,11 @@ namespace Aika {
                     }
                     var queryStartTime = utcStartTime.Subtract(sampleInterval);
 
-                    query = _dataReader.ReadHistoricalData(identity, authorisedTagNames, DataQueryFunction.Raw.Name, queryStartTime, utcEndTime, sampleInterval, cancellationToken).ContinueWith(t => {
+                    query = _dataReader.ReadRawData(identity, authorisedTagNames, queryStartTime, utcEndTime, 0, cancellationToken).ContinueWith(t => {
                         var aggregator = new Aggregation.AggregationUtility(_loggerFactory);
                         // We'll hint that PLOT and INTERP data can be interpolated on a chart, but 
                         // other functions should use trailing-edge transitions.
-                        var visualizationHint = DataQueryFunction.Interpolated.Name.Equals(dataFunction, StringComparison.OrdinalIgnoreCase) || DataQueryFunction.Plot.Name.Equals(dataFunction, StringComparison.OrdinalIgnoreCase)
+                        var visualizationHint = DataQueryFunction.Interpolated.Equals(dataFunction, StringComparison.OrdinalIgnoreCase) || DataQueryFunction.Plot.Equals(dataFunction, StringComparison.OrdinalIgnoreCase)
                             ? TagValueCollectionVisualizationHint.Interpolated
                             : TagValueCollectionVisualizationHint.TrailingEdge;
 
@@ -312,21 +422,35 @@ namespace Aika {
         }
 
 
-        public Task<IDictionary<string, TagValueCollection>> ReadHistoricalData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Performs an aggregated data query.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagNames">The tag names to query.</param>
+        /// <param name="dataFunction">
+        ///   The aggregate data function to use.  Call <see cref="GetAvailableDataQueryFunctions(CancellationToken)"/> 
+        ///   to get the available functions.
+        /// </param>
+        /// <param name="utcStartTime"></param>
+        /// <param name="utcEndTime"></param>
+        /// <param name="sampleInterval"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
             if (_dataReader == null) {
                 throw new NotSupportedException();
             }
 
-            return ReadHistoricalData(identity, tagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, null, cancellationToken);
+            return ReadProcessedData(identity, tagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, null, cancellationToken);
         }
 
 
-        public Task<IDictionary<string, TagValueCollection>> ReadHistoricalData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+        public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
             if (_dataReader == null) {
                 throw new NotSupportedException();
             }
 
-            return ReadHistoricalData(identity, tagNames, dataFunction, utcStartTime, utcEndTime, TimeSpan.Zero, pointCount, cancellationToken);
+            return ReadProcessedData(identity, tagNames, dataFunction, utcStartTime, utcEndTime, TimeSpan.Zero, pointCount, cancellationToken);
         }
 
 

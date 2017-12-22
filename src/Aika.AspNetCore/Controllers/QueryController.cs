@@ -158,7 +158,7 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to snapshot value.
         /// </returns>
         [HttpPost]
-        [Route("snapshot")]
+        [Route("tags/snapshot")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, TagValueDto>))]
         public async Task<IActionResult> GetSnapshotData([FromBody] SnapshotDataRequest request, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
@@ -198,7 +198,7 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to snapshot value.
         /// </returns>
         [HttpGet]
-        [Route("snapshot")]
+        [Route("tags/snapshot")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, TagValueDto>))]
         public Task<IActionResult> GetSnapshotData([FromQuery] string[] tag, CancellationToken cancellationToken) {
             var model = new SnapshotDataRequest() {
@@ -211,17 +211,17 @@ namespace Aika.AspNetCore.Controllers {
 
 
         /// <summary>
-        /// Performs a historical data query.
+        /// Performs a raw, unprocessed data query.
         /// </summary>
-        /// <param name="request">The historical data request.</param>
-        /// <param name="cancellationToken">The cancellation token for the response.</param>
+        /// <param name="request">The raw data request.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// Successful responses contain a dictionary that maps from tag name to historical tag values.
         /// </returns>
         [HttpPost]
-        [Route("history")]
+        [Route("tags/raw")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
-        public async Task<IActionResult> GetHistoricalData([FromBody] HistoricalDataRequest request, CancellationToken cancellationToken) {
+        public async Task<IActionResult> GetRawData([FromBody] RawDataRequest request, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
@@ -229,9 +229,7 @@ namespace Aika.AspNetCore.Controllers {
             var identity = (ClaimsIdentity) User.Identity;
 
             try {
-                var result = request.SampleInterval.HasValue
-                    ? await _historian.ReadHistoricalData(identity, request.Tags, request.Function, request.Start, request.End, request.SampleInterval.Value, cancellationToken).ConfigureAwait(false)
-                    : await _historian.ReadHistoricalData(identity, request.Tags, request.Function, request.Start, request.End, request.PointCount.Value, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.ReadRawData(identity, request.Tags, request.Start, request.End, request.PointCount, cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToDictionary(x => x.Key, x => new HistoricalTagValuesDto(x.Value))); // 200
             }
             catch (ArgumentException) {
@@ -253,7 +251,76 @@ namespace Aika.AspNetCore.Controllers {
 
 
         /// <summary>
-        /// Performs a historical data query.
+        /// Performs a raw, unprocessed data query.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the response.</param>
+        /// <param name="tag">The tag names to query.</param>
+        /// <param name="start">The UTC start time for the query.</param>
+        /// <param name="end">The UTC end time for the query.</param>
+        /// <param name="pointCount">The point count to use for the query.</param>
+        /// <returns>
+        /// Successful responses contain a dictionary that maps from tag name to historical tag values.
+        /// </returns>
+        [HttpGet]
+        [Route("tags/processed")]
+        [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
+        public Task<IActionResult> GetRawData([FromQuery] string[] tag, [FromQuery] DateTime start, [FromQuery] DateTime end, [FromQuery] int pointCount, CancellationToken cancellationToken) {
+            var model = new RawDataRequest() {
+                Tags = tag,
+                Start = start,
+                End = end,
+                PointCount = pointCount
+            };
+
+            TryValidateModel(model);
+            return GetRawData(model, cancellationToken);
+        }
+
+
+        /// <summary>
+        /// Performs an aggregated data query.
+        /// </summary>
+        /// <param name="request">The historical data request.</param>
+        /// <param name="cancellationToken">The cancellation token for the response.</param>
+        /// <returns>
+        /// Successful responses contain a dictionary that maps from tag name to historical tag values.
+        /// </returns>
+        [HttpPost]
+        [Route("tags/processed")]
+        [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
+        public async Task<IActionResult> GetProcessedData([FromBody] AggregatedDataRequest request, CancellationToken cancellationToken) {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState); // 400
+            }
+
+            var identity = (ClaimsIdentity) User.Identity;
+
+            try {
+                var result = request.SampleInterval.HasValue
+                    ? await _historian.ReadProcessedData(identity, request.Tags, request.Function, request.Start, request.End, request.SampleInterval.Value, cancellationToken).ConfigureAwait(false)
+                    : await _historian.ReadProcessedData(identity, request.Tags, request.Function, request.Start, request.End, request.PointCount.Value, cancellationToken).ConfigureAwait(false);
+                return Ok(result.ToDictionary(x => x.Key, x => new HistoricalTagValuesDto(x.Value))); // 200
+            }
+            catch (ArgumentException) {
+                return BadRequest(); // 400
+            }
+            catch (OperationCanceledException) {
+                return StatusCode(204); // 204
+            }
+            catch (SecurityException) {
+                return Unauthorized(); // 401
+            }
+            catch (NotSupportedException) {
+                return BadRequest(); // 400
+            }
+            catch (NotImplementedException) {
+                return BadRequest(); // 400
+            }
+        }
+
+
+        /// <summary>
+        /// Performs an aggregated data query.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token for the response.</param>
         /// <param name="tag">The tag names to query.</param>
@@ -266,10 +333,10 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to historical tag values.
         /// </returns>
         [HttpGet]
-        [Route("history")]
+        [Route("tags/processed")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
-        public Task<IActionResult> GetHistoricalData(CancellationToken cancellationToken, [FromQuery] string[] tag, [FromQuery] string function, [FromQuery] DateTime start, [FromQuery] DateTime end, [FromQuery] TimeSpan? sampleInterval = null, [FromQuery] int? pointCount = null) {
-            var model = new HistoricalDataRequest() {
+        public Task<IActionResult> GetProcessedData(CancellationToken cancellationToken, [FromQuery] string[] tag, [FromQuery] string function, [FromQuery] DateTime start, [FromQuery] DateTime end, [FromQuery] TimeSpan? sampleInterval = null, [FromQuery] int? pointCount = null) {
+            var model = new AggregatedDataRequest() {
                 Tags = tag,
                 Function = function,
                 Start = start,
@@ -279,7 +346,7 @@ namespace Aika.AspNetCore.Controllers {
             };
 
             TryValidateModel(model);
-            return GetHistoricalData(model, cancellationToken);
+            return GetProcessedData(model, cancellationToken);
         }
 
     }

@@ -50,37 +50,60 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, performs a historical data query on the historian.
+        /// When implemented in a derived type, reads raw, unprocessed tag data.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagNames">The names of the tags to query.</param>
-        /// <param name="dataFunction">The data function specifying the type of aggregation to perform on the data.  See <see cref="DataQueryFunction"/> for common function names.</param>
         /// <param name="utcStartTime">The UTC start time for the query.</param>
         /// <param name="utcEndTime">The UTC end time for the query.</param>
-        /// <param name="sampleInterval">The sample interval to use for aggregation.  The exact interpretation of this parameter depends on the <paramref name="dataFunction"/> that is used.</param>
+        /// <param name="pointCount">
+        ///   The maximum number of samples to return per tag.  Note that the implementation can apply 
+        ///   its own restrictions to this limit.  A value of less than one should result in all raw 
+        ///   samples between the start and end time being returned, up to the implementation's own 
+        ///   internal limit.
+        /// </param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A dictionary of historical data, indexed by tag name.
         /// </returns>
-        /// <seealso cref="DataQueryFunction"/>
-        Task<IDictionary<string, TagValueCollection>> ReadHistoricalData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken);
+        Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsIdentity identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken);
 
 
         /// <summary>
-        /// When implemented in a derived type, performs a historical data query on the historian.
+        /// When implemented in a derived type, performs an aggregated data query on the historian.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagNames">The names of the tags to query.</param>
         /// <param name="dataFunction">The data function specifying the type of aggregation to perform on the data.  See <see cref="DataQueryFunction"/> for common function names.</param>
         /// <param name="utcStartTime">The UTC start time for the query.</param>
         /// <param name="utcEndTime">The UTC end time for the query.</param>
-        /// <param name="pointCount">The number of samples to return.  The exact interpretation of this parameter depends on the <paramref name="dataFunction"/> that is used.</param>
+        /// <param name="sampleInterval">The sample interval to use for aggregation.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A dictionary of historical data, indexed by tag name.
         /// </returns>
         /// <seealso cref="DataQueryFunction"/>
-        Task<IDictionary<string, TagValueCollection>> ReadHistoricalData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken);
+        Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken);
+
+
+        /// <summary>
+        /// When implemented in a derived type, performs an aggregated data query on the historian.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagNames">The names of the tags to query.</param>
+        /// <param name="dataFunction">The data function specifying the type of aggregation to perform on the data.  See <see cref="DataQueryFunction"/> for common function names.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="pointCount">
+        ///   The maximum number of samples to return per tag.  Note that the implementation can apply 
+        ///   its own restrictions to this limit.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A dictionary of historical data, indexed by tag name.
+        /// </returns>
+        /// <seealso cref="DataQueryFunction"/>
+        Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken);
 
     }
 }

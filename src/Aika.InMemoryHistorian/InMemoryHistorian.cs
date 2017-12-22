@@ -25,6 +25,8 @@ namespace Aika.Historians {
 
         private readonly ILoggerFactory _loggerFactory;
 
+        private const int MaxRawSampleCount = 5000;
+
         public string Description {
             get { return "In-memory data store."; }
         }
@@ -107,7 +109,17 @@ namespace Aika.Historians {
         }
 
 
-        private Task<IDictionary<string, TagValueCollection>> ReadHistoricalData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
+        public Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsIdentity identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
+            var tags = _tags.Values.Where(x => tagNames.Any(n => String.Equals(n, x.Id, StringComparison.OrdinalIgnoreCase) || String.Equals(n, x.Name, StringComparison.OrdinalIgnoreCase)));
+            var result = new Dictionary<string, TagValue>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in tags) {
+                result[item.Name] = item.SnapshotValue;
+            }
+            return Task.FromResult<IDictionary<string, TagValue>>(result);
+        }
+
+
+        private Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsIdentity identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
             var result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
 
             var tags = _tags.Values.Where(x => tagNames.Any(n => String.Equals(n, x.Id, StringComparison.OrdinalIgnoreCase) || String.Equals(n, x.Name, StringComparison.OrdinalIgnoreCase)));
@@ -118,16 +130,16 @@ namespace Aika.Historians {
 
                 rawData.Lock.EnterReadLock();
                 try {
-                    var selected = rawData.Values.Where(x => x.UtcSampleTime >= utcStartTime && x.UtcSampleTime <= utcEndTime);
-                    if (pointCount.HasValue) {
-                        selected = selected.Take(pointCount.Value);
-                    }
+                    var take = pointCount.HasValue
+                        ? pointCount.Value < 1 || pointCount.Value > MaxRawSampleCount
+                            ? MaxRawSampleCount
+                            : pointCount.Value
+                        : MaxRawSampleCount;
+                    var selected = rawData.Values.Where(x => x.UtcSampleTime >= utcStartTime && x.UtcSampleTime <= utcEndTime).Take(take);
 
                     result[tag.Name] = new TagValueCollection() {
                         Values = selected.ToArray(),
-                        VisualizationHint = DataQueryFunction.Interpolated.Name.Equals(dataFunction, StringComparison.OrdinalIgnoreCase) || DataQueryFunction.Plot.Name.Equals(dataFunction, StringComparison.OrdinalIgnoreCase)
-                            ? TagValueCollectionVisualizationHint.Interpolated
-                            : TagValueCollectionVisualizationHint.TrailingEdge
+                        VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge
                     };
                 }
                 finally {
@@ -139,23 +151,18 @@ namespace Aika.Historians {
         }
 
 
-        public Task<IDictionary<string, TagValueCollection>> ReadHistoricalData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
-            return ReadHistoricalData(identity, tagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, null, cancellationToken);
+        public Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsIdentity identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+            return ReadRawData(identity, tagNames, utcStartTime, utcEndTime, TimeSpan.Zero, pointCount, cancellationToken);
         }
 
 
-        public Task<IDictionary<string, TagValueCollection>> ReadHistoricalData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
-            return ReadHistoricalData(identity, tagNames, dataFunction, utcStartTime, utcEndTime, TimeSpan.Zero, pointCount, cancellationToken);
+        public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+            throw new NotSupportedException();
         }
 
 
-        public Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsIdentity identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var tags = _tags.Values.Where(x => tagNames.Any(n => String.Equals(n, x.Id, StringComparison.OrdinalIgnoreCase) || String.Equals(n, x.Name, StringComparison.OrdinalIgnoreCase)));
-            var result = new Dictionary<string, TagValue>(StringComparer.OrdinalIgnoreCase);
-            foreach (var item in tags) {
-                result[item.Name] = item.SnapshotValue;
-            }
-            return Task.FromResult<IDictionary<string, TagValue>>(result);
+        public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+            throw new NotSupportedException();
         }
 
 
