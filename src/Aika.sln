@@ -1,0 +1,43 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27130.2010
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika", "Aika\Aika.csproj", "{05BCDA09-9602-4ECB-A455-2E82D930955A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.Redis", "Aika.Redis\Aika.Redis.csproj", "{895B0C1A-6909-4990-8F4F-C4123F22345D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.AspNetCore", "Aika.AspNetCore\Aika.AspNetCore.csproj", "{DDAE98F6-5B57-4771-B7A9-16514BBDA690}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.InMemoryHistorian", "Aika.InMemoryHistorian\Aika.InMemoryHistorian.csproj", "{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{05BCDA09-9602-4ECB-A455-2E82D930955A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05BCDA09-9602-4ECB-A455-2E82D930955A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05BCDA09-9602-4ECB-A455-2E82D930955A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05BCDA09-9602-4ECB-A455-2E82D930955A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{895B0C1A-6909-4990-8F4F-C4123F22345D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{895B0C1A-6909-4990-8F4F-C4123F22345D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{895B0C1A-6909-4990-8F4F-C4123F22345D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{895B0C1A-6909-4990-8F4F-C4123F22345D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DDAE98F6-5B57-4771-B7A9-16514BBDA690}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DDAE98F6-5B57-4771-B7A9-16514BBDA690}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DDAE98F6-5B57-4771-B7A9-16514BBDA690}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DDAE98F6-5B57-4771-B7A9-16514BBDA690}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A0391908-7746-4AF8-B71D-2561902532FA}
+	EndGlobalSection
+EndGlobal
