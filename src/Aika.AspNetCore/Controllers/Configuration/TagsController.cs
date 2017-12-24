@@ -111,6 +111,14 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         }
 
 
+        /// <summary>
+        /// Gets the extended tag definition for the specified ID.
+        /// </summary>
+        /// <param name="id">The tag ID.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// Successful responses contain the extended definition for the tag.
+        /// </returns>
         [HttpGet]
         [Route("{id}", Name = "GetTagById")]
         [ProducesResponseType(200, Type = typeof(TagDefinitionExtendedDto))]

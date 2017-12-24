@@ -23,13 +23,13 @@ namespace Aika.AspNetCore.Models.Query {
         /// Gets or sets the UTC query start time.
         /// </summary>
         [Required]
-        public DateTime Start { get; set; }
+        public string Start { get; set; }
 
         /// <summary>
         /// Gets or sets the UTC query end time.
         /// </summary>
         [Required]
-        public DateTime End { get; set; }
+        public string End { get; set; }
 
 
         /// <summary>
@@ -40,7 +40,14 @@ namespace Aika.AspNetCore.Models.Query {
         /// A collection of validation errors.
         /// </returns>
         public virtual IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
-            if (Start >= End) {
+            if (!Start.TryConvertToUtcDateTime(out var start)) {
+                yield return new ValidationResult("Invalid start time.", new[] { nameof(Start) });
+            }
+            if (!End.TryConvertToUtcDateTime(out var end)) {
+                yield return new ValidationResult("Invalid end time.", new[] { nameof(End) });
+            }
+
+            if (start >= end) {
                 yield return new ValidationResult("Start time must be less than end time.", new[] { nameof(Start) });
             }
         }

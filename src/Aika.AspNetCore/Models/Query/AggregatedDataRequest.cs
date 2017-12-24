@@ -20,7 +20,7 @@ namespace Aika.AspNetCore.Models.Query {
         /// <summary>
         /// Gets or sets the query sample interval.
         /// </summary>
-        public TimeSpan? SampleInterval { get; set; }
+        public string SampleInterval { get; set; }
 
         /// <summary>
         /// Gets or sets the query point count.
@@ -41,16 +41,21 @@ namespace Aika.AspNetCore.Models.Query {
                 yield return item;
             }
 
-            if (!SampleInterval.HasValue && !PointCount.HasValue) {
+            if (SampleInterval == null && !PointCount.HasValue) {
                 yield return new ValidationResult("Queries must specify either a sample interval, or a point count.", new[] { nameof(SampleInterval), nameof(PointCount) });
             }
 
-            if (SampleInterval.HasValue && PointCount.HasValue) {
+            if (SampleInterval != null && PointCount.HasValue) {
                 yield return new ValidationResult("Queries can specified either a sample interval, or a point count, but not both.", new[] { nameof(SampleInterval), nameof(PointCount) });
             }
 
-            if (SampleInterval.HasValue && SampleInterval.Value <= TimeSpan.Zero) {
-                yield return new ValidationResult("Sample interval must be greater than zero.", new[] { nameof(SampleInterval) });
+            if (SampleInterval != null) {
+                if (!SampleInterval.TryConvertToTimeSpan(out var sampleInterval)) {
+                    yield return new ValidationResult("Invalid sample interval.", new[] { nameof(SampleInterval) });
+                }
+                else if (sampleInterval <= TimeSpan.Zero) {
+                    yield return new ValidationResult("Sample interval must be greater than zero.", new[] { nameof(SampleInterval) });
+                }
             }
         }
     }

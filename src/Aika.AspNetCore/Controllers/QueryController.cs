@@ -76,6 +76,32 @@ namespace Aika.AspNetCore.Controllers {
 
 
         /// <summary>
+        /// Performs a tag search.
+        /// </summary>
+        /// <param name="request">The tag search request.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// Successful responses contain a page of matching search results.
+        /// </returns>
+        [HttpGet]
+        [Route("tags")]
+        [ProducesResponseType(200, Type = typeof(IEnumerable<TagDefinitionDto>))]
+        public Task<IActionResult> GetTags(CancellationToken cancellationToken, string name = null, string description = null, string units = null, int pageSize = 10, int page = 1) {
+            var model = new TagSearchRequest() {
+                Name = name,
+                Description = description,
+                Units = units,
+                PageSize = pageSize,
+                Page = page,
+                Type = TagDefinitionFilterJoinType.And
+            };
+
+            TryValidateModel(model);
+            return GetTags(model, cancellationToken);
+        }
+
+
+        /// <summary>
         /// Gets the available state set definitions (i.e. the sets of named states that discrete, state-based tags can use).
         /// </summary>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
@@ -229,7 +255,7 @@ namespace Aika.AspNetCore.Controllers {
             var identity = (ClaimsIdentity) User.Identity;
 
             try {
-                var result = await _historian.ReadRawData(identity, request.Tags, request.Start, request.End, request.PointCount, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.ReadRawData(identity, request.Tags, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.PointCount, cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToDictionary(x => x.Key, x => new HistoricalTagValuesDto(x.Value))); // 200
             }
             catch (ArgumentException) {
@@ -262,9 +288,9 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to historical tag values.
         /// </returns>
         [HttpGet]
-        [Route("tags/processed")]
+        [Route("tags/raw")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
-        public Task<IActionResult> GetRawData([FromQuery] string[] tag, [FromQuery] DateTime start, [FromQuery] DateTime end, [FromQuery] int pointCount, CancellationToken cancellationToken) {
+        public Task<IActionResult> GetRawData(CancellationToken cancellationToken, [FromQuery] string[] tag, [FromQuery] string start, [FromQuery] string end, [FromQuery] int pointCount = 0) {
             var model = new RawDataRequest() {
                 Tags = tag,
                 Start = start,
@@ -296,9 +322,9 @@ namespace Aika.AspNetCore.Controllers {
             var identity = (ClaimsIdentity) User.Identity;
 
             try {
-                var result = request.SampleInterval.HasValue
-                    ? await _historian.ReadProcessedData(identity, request.Tags, request.Function, request.Start, request.End, request.SampleInterval.Value, cancellationToken).ConfigureAwait(false)
-                    : await _historian.ReadProcessedData(identity, request.Tags, request.Function, request.Start, request.End, request.PointCount.Value, cancellationToken).ConfigureAwait(false);
+                var result = request.SampleInterval != null
+                    ? await _historian.ReadProcessedData(identity, request.Tags, request.Function, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.SampleInterval.ToTimeSpan(), cancellationToken).ConfigureAwait(false)
+                    : await _historian.ReadProcessedData(identity, request.Tags, request.Function, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.PointCount.Value, cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToDictionary(x => x.Key, x => new HistoricalTagValuesDto(x.Value))); // 200
             }
             catch (ArgumentException) {
@@ -335,7 +361,7 @@ namespace Aika.AspNetCore.Controllers {
         [HttpGet]
         [Route("tags/processed")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
-        public Task<IActionResult> GetProcessedData(CancellationToken cancellationToken, [FromQuery] string[] tag, [FromQuery] string function, [FromQuery] DateTime start, [FromQuery] DateTime end, [FromQuery] TimeSpan? sampleInterval = null, [FromQuery] int? pointCount = null) {
+        public Task<IActionResult> GetProcessedData(CancellationToken cancellationToken, [FromQuery] string[] tag, [FromQuery] string function, [FromQuery] string start, [FromQuery] string end, [FromQuery] string sampleInterval = null, [FromQuery] int? pointCount = null) {
             var model = new AggregatedDataRequest() {
                 Tags = tag,
                 Function = function,

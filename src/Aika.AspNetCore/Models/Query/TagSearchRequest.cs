@@ -17,7 +17,7 @@ namespace Aika.AspNetCore.Models.Query {
         public int Page { get; set; }
 
         [Required]
-        TagDefinitionFilterJoinType Type { get; set; }
+        public TagDefinitionFilterJoinType Type { get; set; }
 
         [MaxLength(100)]
         public string Name { get; set; }
@@ -26,7 +26,7 @@ namespace Aika.AspNetCore.Models.Query {
         public string Description { get; set; }
 
         [MaxLength(100)]
-        public string Unit { get; set; }
+        public string Units { get; set; }
 
 
         internal TagDefinitionFilter ToTagDefinitionFilter() {
@@ -38,7 +38,7 @@ namespace Aika.AspNetCore.Models.Query {
             if (!String.IsNullOrWhiteSpace(Description)) {
                 clauses.Add(new TagDefinitionFilterClause() { Field = TagDefinitionFilterField.Name, Value = Name });
             }
-            if (!String.IsNullOrWhiteSpace(Unit)) {
+            if (!String.IsNullOrWhiteSpace(Units)) {
                 clauses.Add(new TagDefinitionFilterClause() { Field = TagDefinitionFilterField.Name, Value = Name });
             }
 

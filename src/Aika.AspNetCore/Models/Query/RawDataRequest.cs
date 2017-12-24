@@ -15,7 +15,7 @@ namespace Aika.AspNetCore.Models.Query {
         /// Gets or sets the maximum number of samples to retrieve per tag.
         /// </summary>
         [Required]
-        [Range(1, Int32.MaxValue)]
+        [Range(0, Int32.MaxValue)]
         public int PointCount { get; set; }
 
     }

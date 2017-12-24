@@ -8,9 +8,12 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace Aika.AspNetCore {
-    public class Program {
-        public static void Main(string[] args) {
+namespace Aika.SampleApp
+{
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
             BuildWebHost(args).Run();
         }
 

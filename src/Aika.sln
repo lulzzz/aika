@@ -5,9 +5,11 @@ VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika", "Aika\Aika.csproj", "{05BCDA09-9602-4ECB-A455-2E82D930955A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.AspNetCore", "Aika.AspNetCore\Aika.AspNetCore.csproj", "{DDAE98F6-5B57-4771-B7A9-16514BBDA690}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.InMemoryHistorian", "Aika.InMemoryHistorian\Aika.InMemoryHistorian.csproj", "{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aika.SampleApp", "Aika.SampleApp\Aika.SampleApp.csproj", "{E4486316-6517-4E2C-8039-DDDE4434CB6B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aika.AspNetCore", "Aika.AspNetCore\Aika.AspNetCore.csproj", "{BEC0FBBA-4516-48F0-BB39-CE645F6B2217}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,14 +21,18 @@ Global
 		{05BCDA09-9602-4ECB-A455-2E82D930955A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{05BCDA09-9602-4ECB-A455-2E82D930955A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{05BCDA09-9602-4ECB-A455-2E82D930955A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DDAE98F6-5B57-4771-B7A9-16514BBDA690}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DDAE98F6-5B57-4771-B7A9-16514BBDA690}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DDAE98F6-5B57-4771-B7A9-16514BBDA690}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DDAE98F6-5B57-4771-B7A9-16514BBDA690}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4486316-6517-4E2C-8039-DDDE4434CB6B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4486316-6517-4E2C-8039-DDDE4434CB6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4486316-6517-4E2C-8039-DDDE4434CB6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4486316-6517-4E2C-8039-DDDE4434CB6B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BEC0FBBA-4516-48F0-BB39-CE645F6B2217}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BEC0FBBA-4516-48F0-BB39-CE645F6B2217}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BEC0FBBA-4516-48F0-BB39-CE645F6B2217}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BEC0FBBA-4516-48F0-BB39-CE645F6B2217}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
