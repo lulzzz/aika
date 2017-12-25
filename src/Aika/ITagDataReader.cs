@@ -21,7 +21,7 @@ namespace Aika {
         /// <returns>
         /// A dictionary that maps from tag name to authorization result.
         /// </returns>
-        Task<IDictionary<string, bool>> CanReadTagData(ClaimsIdentity identity, IEnumerable<string> tagNames, CancellationToken cancellationToken);
+        Task<IDictionary<string, bool>> CanReadTagData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -46,7 +46,7 @@ namespace Aika {
         /// <returns>
         /// A dictionary of snapshot values, indexed by tag name.
         /// </returns>
-        Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsIdentity identity, IEnumerable<string> tagNames, CancellationToken cancellationToken);
+        Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -66,7 +66,7 @@ namespace Aika {
         /// <returns>
         /// A dictionary of historical data, indexed by tag name.
         /// </returns>
-        Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsIdentity identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken);
+        Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -83,7 +83,7 @@ namespace Aika {
         /// A dictionary of historical data, indexed by tag name.
         /// </returns>
         /// <seealso cref="DataQueryFunction"/>
-        Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken);
+        Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -103,7 +103,7 @@ namespace Aika {
         /// A dictionary of historical data, indexed by tag name.
         /// </returns>
         /// <seealso cref="DataQueryFunction"/>
-        Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken);
+        Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken);
 
     }
 }

@@ -45,10 +45,8 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         [Route("")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, StateSetDto>))]
         public async Task<IActionResult> GetStateSets(CancellationToken cancellationToken) {
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.GetStateSets(identity, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.GetStateSets(User, cancellationToken).ConfigureAwait(false);
                 return Ok(result.Values.OrderBy(x => x.Name).ToDictionary(x => x.Name, x => new StateSetDto(x))); // 200
             }
             catch (ArgumentException) {
@@ -81,10 +79,8 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         [Route("{name}", Name = "GetStateSetByName")]
         [ProducesResponseType(200, Type = typeof(StateSetDto))]
         public async Task<IActionResult> GetStateSet([FromRoute] string name, CancellationToken cancellationToken) {
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.GetStateSet(identity, name, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.GetStateSet(User, name, cancellationToken).ConfigureAwait(false);
                 if (result == null) {
                     return NotFound(); // 404
                 }
@@ -124,10 +120,8 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.CreateStateSet(identity, stateSet.Name, stateSet.States.Where(x => x != null).Select(x => x.ToStateSetItem()).ToArray(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.CreateStateSet(User, stateSet.Name, stateSet.States.Where(x => x != null).Select(x => x.ToStateSetItem()).ToArray(), cancellationToken).ConfigureAwait(false);
                 return CreatedAtRoute("GetStateSetByName", new { name = result.Name }, result); // 201
             }
             catch (ArgumentException) {
@@ -163,11 +157,9 @@ namespace Aika.AspNetCore.Controllers.Configuration {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
-
-            var identity = (ClaimsIdentity) User.Identity;
-
+            
             try {
-                var result = await _historian.UpdateStateSet(identity, stateSet.Name, stateSet.States?.Where(x => x != null).Select(x => x.ToStateSetItem()).ToArray(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.UpdateStateSet(User, stateSet.Name, stateSet.States?.Where(x => x != null).Select(x => x.ToStateSetItem()).ToArray(), cancellationToken).ConfigureAwait(false);
                 return Ok(result); // 200
             }
             catch (ArgumentException) {
@@ -203,11 +195,9 @@ namespace Aika.AspNetCore.Controllers.Configuration {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
-
-            var identity = (ClaimsIdentity) User.Identity;
-
+            
             try {
-                var result = await _historian.DeleteStateSet(identity, name, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.DeleteStateSet(User, name, cancellationToken).ConfigureAwait(false);
                 return Ok(result); // 200
             }
             catch (ArgumentException) {

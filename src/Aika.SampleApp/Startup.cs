@@ -51,7 +51,7 @@ namespace Aika.SampleApp {
         }
 
 
-        private System.Security.Claims.ClaimsIdentity GetSystemIdentity() {
+        private System.Security.Claims.ClaimsPrincipal GetSystemIdentity() {
             var identity = new System.Security.Claims.ClaimsIdentity("Aika");
             identity.AddClaim(new System.Security.Claims.Claim(identity.NameClaimType, "AikaSystem"));
             identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Roles.Administrator));
@@ -59,7 +59,7 @@ namespace Aika.SampleApp {
             identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Roles.ReadTagData));
             identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Roles.WriteTagData));
 
-            return identity;
+            return new System.Security.Claims.ClaimsPrincipal(identity);
         }
 
 

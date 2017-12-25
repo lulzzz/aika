@@ -93,12 +93,12 @@ namespace Aika {
         /// <returns>
         /// A flag that indicates if the <paramref name="identity"/> is in the specified role.
         /// </returns>
-        private static bool IsInRole(ClaimsIdentity identity, string roleName, bool throwIfIdentityIsNull) {
+        private static bool IsInRole(ClaimsPrincipal identity, string roleName, bool throwIfIdentityIsNull) {
             if (identity == null && throwIfIdentityIsNull) {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            return identity?.HasClaim(identity.RoleClaimType, roleName) ?? true;
+            return identity?.IsInRole(roleName) ?? true;
         }
 
 
@@ -130,7 +130,7 @@ namespace Aika {
         /// <returns>
         /// A task that will return matching tag definitions.
         /// </returns>
-        public async Task<IEnumerable<TagDefinition>> GetTags(ClaimsIdentity identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+        public async Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -153,7 +153,7 @@ namespace Aika {
         /// <returns>
         /// A task that will return the tag definitions.
         /// </returns>
-        private async Task<IEnumerable<TagDefinition>> GetTags(ClaimsIdentity identity, IEnumerable<string> tagNames, Func<ClaimsIdentity, IEnumerable<string>, CancellationToken, Task<IDictionary<string, bool>>> func, CancellationToken cancellationToken) {
+        private async Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, Func<ClaimsPrincipal, IEnumerable<string>, CancellationToken, Task<IDictionary<string, bool>>> func, CancellationToken cancellationToken) {
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -190,7 +190,7 @@ namespace Aika {
         /// A task that will return the tag definitions.
         /// </returns>
         /// <exception cref="NotSupportedException">The underlying <see cref="IHistorian"/> does not implement <see cref="ITagDataReader"/>.</exception>
-        public Task<IEnumerable<TagDefinition>> GetTags(ClaimsIdentity identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
+        public Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
             if (_dataReader == null) {
                 throw new NotSupportedException();
             }
@@ -242,7 +242,7 @@ namespace Aika {
         /// <param name="pointCount"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public async Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsIdentity identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+        public async Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
             if (_dataReader == null) {
                 throw new NotSupportedException();
             }
@@ -317,7 +317,7 @@ namespace Aika {
         /// <returns>
         /// The results of the query, indexed by tag name.
         /// </returns>
-        private async Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
+        private async Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -436,7 +436,7 @@ namespace Aika {
         /// <param name="sampleInterval"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+        public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
             if (_dataReader == null) {
                 throw new NotSupportedException();
             }
@@ -445,7 +445,7 @@ namespace Aika {
         }
 
 
-        public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsIdentity identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+        public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
             if (_dataReader == null) {
                 throw new NotSupportedException();
             }
@@ -454,7 +454,7 @@ namespace Aika {
         }
 
 
-        public async Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsIdentity identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
+        public async Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
             if (_dataReader == null) {
                 throw new NotSupportedException();
             }
@@ -509,7 +509,7 @@ namespace Aika {
         /// <see cref="SnapshotSubscription.ValuesReceived"/> event will receive snapshot value 
         /// changes as they occur.
         /// </returns>
-        public SnapshotSubscription CreateSnapshotSubscription(ClaimsIdentity identity) {
+        public SnapshotSubscription CreateSnapshotSubscription(ClaimsPrincipal identity) {
             if (_dataReader == null) {
                 throw new NotSupportedException();
             }
@@ -529,7 +529,7 @@ namespace Aika {
 
         #region [ Tag Data Writes ]
 
-        private Task<IEnumerable<TagDefinition>> GetWriteableTags(ClaimsIdentity identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
+        private Task<IEnumerable<TagDefinition>> GetWriteableTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
             var task = GetTags(identity,
                                tagNames,
                                (id, n, ct) => _dataWriter.CanWriteTagData(id, n, ct),
@@ -550,7 +550,7 @@ namespace Aika {
         /// </returns>
         /// <exception cref="NotSupportedException">The underlying <see cref="IHistorian"/> does not implement <see cref="ITagDataWriter"/>.</exception>
         /// <exception cref="SecurityException">The calling <paramref name="identity"/> is not authorized to write tag data.</exception>
-        public async Task<IDictionary<string, WriteTagValuesResult>> InsertTagData(ClaimsIdentity identity, IDictionary<string, IEnumerable<TagValue>> values, CancellationToken cancellationToken) {
+        public async Task<IDictionary<string, WriteTagValuesResult>> InsertTagData(ClaimsPrincipal identity, IDictionary<string, IEnumerable<TagValue>> values, CancellationToken cancellationToken) {
             if (_dataWriter == null) {
                 throw new NotSupportedException();
             }
@@ -633,7 +633,7 @@ namespace Aika {
         /// </returns>
         /// <exception cref="NotSupportedException">The underlying <see cref="IHistorian"/> does not implement <see cref="ITagDataWriter"/>.</exception>
         /// <exception cref="SecurityException">The calling <paramref name="identity"/> is not authorized to write tag data.</exception>
-        public async Task<IDictionary<string, WriteTagValuesResult>> WriteTagData(ClaimsIdentity identity, IDictionary<string, IEnumerable<TagValue>> values, CancellationToken cancellationToken) {
+        public async Task<IDictionary<string, WriteTagValuesResult>> WriteTagData(ClaimsPrincipal identity, IDictionary<string, IEnumerable<TagValue>> values, CancellationToken cancellationToken) {
             if (_dataWriter == null) {
                 throw new NotSupportedException();
             }
@@ -689,7 +689,7 @@ namespace Aika {
 
         #region [ Tag Management ]
 
-        public async Task<int?> GetTagCount(ClaimsIdentity identity, CancellationToken cancellationToken) {
+        public async Task<int?> GetTagCount(ClaimsPrincipal identity, CancellationToken cancellationToken) {
             if (_tagManager == null) {
                 throw new NotSupportedException();
             }
@@ -726,7 +726,7 @@ namespace Aika {
         }
 
 
-        public async Task<TagDefinition> CreateTag(ClaimsIdentity identity, TagDefinitionUpdate tag, CancellationToken cancellationToken) {
+        public async Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagDefinitionUpdate tag, CancellationToken cancellationToken) {
             if (_tagManager == null) {
                 throw new NotSupportedException();
             }
@@ -759,7 +759,7 @@ namespace Aika {
         }
 
 
-        public async Task<TagDefinition> UpdateTag(ClaimsIdentity identity, string tagId, TagDefinitionUpdate tag, CancellationToken cancellationToken) {
+        public async Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagDefinitionUpdate tag, CancellationToken cancellationToken) {
             if (_tagManager == null) {
                 throw new NotSupportedException();
             }
@@ -788,7 +788,7 @@ namespace Aika {
         }
 
 
-        public async Task<bool> DeleteTag(ClaimsIdentity identity, string tagIdOrName, CancellationToken cancellationToken) {
+        public async Task<bool> DeleteTag(ClaimsPrincipal identity, string tagIdOrName, CancellationToken cancellationToken) {
             if (_tagManager == null) {
                 throw new NotSupportedException();
             }
@@ -805,7 +805,7 @@ namespace Aika {
         }
 
 
-        public async Task<IDictionary<string, StateSet>> GetStateSets(ClaimsIdentity identity, CancellationToken cancellationToken) {
+        public async Task<IDictionary<string, StateSet>> GetStateSets(ClaimsPrincipal identity, CancellationToken cancellationToken) {
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -814,7 +814,7 @@ namespace Aika {
         }
 
 
-        public async Task<StateSet> GetStateSet(ClaimsIdentity identity, string name, CancellationToken cancellationToken) {
+        public async Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -826,7 +826,7 @@ namespace Aika {
         }
 
 
-        public async Task<StateSet> CreateStateSet(ClaimsIdentity identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
+        public async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
             if (_tagManager == null) {
                 throw new NotSupportedException();
             }
@@ -849,7 +849,7 @@ namespace Aika {
         }
 
 
-        public async Task<StateSet> UpdateStateSet(ClaimsIdentity identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
+        public async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
             if (_tagManager == null) {
                 throw new NotSupportedException();
             }
@@ -872,7 +872,7 @@ namespace Aika {
         }
 
 
-        public async Task<bool> DeleteStateSet(ClaimsIdentity identity, string name, CancellationToken cancellationToken) {
+        public async Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
             if (_tagManager == null) {
                 throw new NotSupportedException();
             }

@@ -51,10 +51,8 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.GetTagCount(identity, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.GetTagCount(User, cancellationToken).ConfigureAwait(false);
                 return Ok(result); // 200
             }
             catch (OperationCanceledException) {
@@ -89,8 +87,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
             }
 
             try {
-                var identity = (ClaimsIdentity) User.Identity;
-                var result = await _historian.GetTags(identity, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.GetTags(User, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
                 return Ok(result.Select(x => new TagDefinitionExtendedDto(x)).ToArray()); // 200
             }
             catch (ArgumentException) {
@@ -127,10 +124,8 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.GetTags(identity, new[] { id }, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.GetTags(User, new[] { id }, cancellationToken).ConfigureAwait(false);
                 var tag = result.FirstOrDefault(x => x.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
                 if (tag == null) {
                     return NotFound(id);
@@ -163,10 +158,8 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.CreateTag(identity, tag, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.CreateTag(User, tag, cancellationToken).ConfigureAwait(false);
                 return CreatedAtRoute("GetTagById", new { id = result.Id } ,new TagDefinitionExtendedDto(result)); // 200
             }
             catch (ArgumentException) {
@@ -195,10 +188,8 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.UpdateTag(identity, id, tag, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.UpdateTag(User, id, tag, cancellationToken).ConfigureAwait(false);
                 return Ok(new TagDefinitionExtendedDto(result)); // 200
             }
             catch (ArgumentException) {
@@ -227,10 +218,8 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.DeleteTag(identity, id, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.DeleteTag(User, id, cancellationToken).ConfigureAwait(false);
                 return Ok(result); // 200
             }
             catch (ArgumentException) {

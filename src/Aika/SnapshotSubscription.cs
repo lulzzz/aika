@@ -57,7 +57,7 @@ namespace Aika {
         /// <returns>
         /// A task that will add the tag subscriptions.
         /// </returns>
-        public async Task AddTags(ClaimsIdentity identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
+        public async Task AddTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
             if (_isDisposed) {
                 throw new ObjectDisposedException(GetType().FullName);
             }
@@ -95,7 +95,7 @@ namespace Aika {
         /// <returns>
         /// A task that will remove the tag subscriptions.
         /// </returns>
-        public async Task RemoveTags(ClaimsIdentity identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
+        public async Task RemoveTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
             if (_isDisposed) {
                 throw new ObjectDisposedException(GetType().FullName);
             }

@@ -49,10 +49,8 @@ namespace Aika.AspNetCore.Controllers {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.WriteTagData(identity, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.WriteTagData(User, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToDictionary(x => x.Key, x => new WriteTagValuesResultDto(x.Value))); // 200
             }
             catch (ArgumentException) {
@@ -88,11 +86,9 @@ namespace Aika.AspNetCore.Controllers {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
-
-            var identity = (ClaimsIdentity) User.Identity;
-
+            
             try {
-                var result = await _historian.InsertTagData(identity, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.InsertTagData(User, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToDictionary(x => x.Key, x => new WriteTagValuesResultDto(x.Value))); // 200
             }
             catch (ArgumentException) {

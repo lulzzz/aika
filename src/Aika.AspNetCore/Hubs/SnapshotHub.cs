@@ -40,8 +40,7 @@ namespace Aika.AspNetCore.Hubs {
             var connectionId = Context.ConnectionId;
             return _subscriptions.GetOrAdd(connectionId, key => {
                 var client = Clients.Client(connectionId);
-                var identity = Context.User.Identity as ClaimsIdentity;
-                var subscription = _historian.CreateSnapshotSubscription(identity);
+                var subscription = _historian.CreateSnapshotSubscription(Context.User);
                 subscription.ValuesReceived += values => {
                     client.InvokeAsync("ValuesReceived", values);
                 };
@@ -74,19 +73,17 @@ namespace Aika.AspNetCore.Hubs {
 
 
         public async Task Subscribe(IEnumerable<string> tagNames) {
-            var identity = Context.User.Identity as ClaimsIdentity;
             var connectionId = Context.ConnectionId;
 
             var subscription = GetSubscription();
             if (subscription == null) {
                 return;
             }
-            await subscription.AddTags(identity, tagNames, CancellationToken.None).ConfigureAwait(false);
+            await subscription.AddTags(Context.User, tagNames, CancellationToken.None).ConfigureAwait(false);
         }
 
 
         public async Task Unsubscribe(IEnumerable<string> tagNames) {
-            var identity = Context.User.Identity as ClaimsIdentity;
             var connectionId = Context.ConnectionId;
 
             var subscription = GetSubscription();
@@ -94,7 +91,7 @@ namespace Aika.AspNetCore.Hubs {
                 return;
             }
 
-            await subscription.RemoveTags(identity, tagNames, CancellationToken.None).ConfigureAwait(false);
+            await subscription.RemoveTags(Context.User, tagNames, CancellationToken.None).ConfigureAwait(false);
         }
 
     }

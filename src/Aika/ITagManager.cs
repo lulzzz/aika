@@ -20,7 +20,7 @@ namespace Aika {
         /// The total tag count.  Implementations can return <see langword="null"/> if they do not 
         /// track this number, or if it is impractical to calculate it.
         /// </returns>
-        Task<int?> GetTagCount(ClaimsIdentity identity, CancellationToken cancellationToken);
+        Task<int?> GetTagCount(ClaimsPrincipal identity, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -32,7 +32,7 @@ namespace Aika {
         /// <returns>
         /// The new tag definition.
         /// </returns>
-        Task<TagDefinition> CreateTag(ClaimsIdentity identity, TagDefinitionUpdate tag, CancellationToken cancellationToken);
+        Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagDefinitionUpdate tag, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace Aika {
         /// <remarks>
         /// Implementers should call <see cref="TagDefinition.Update(TagDefinitionUpdate)"/> to update the target tag.
         /// </remarks>
-        Task<TagDefinition> UpdateTag(ClaimsIdentity identity, string tagId, TagDefinitionUpdate update, CancellationToken cancellationToken);
+        Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagDefinitionUpdate update, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace Aika {
         /// <paramref name="tagId"/> does not exist.  Delete operations that fail due to 
         /// authorization issues should throw a <see cref="System.Security.SecurityException"/>.
         /// </remarks>
-        Task<bool> DeleteTag(ClaimsIdentity identity, string tagId, CancellationToken cancellationToken);
+        Task<bool> DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -78,7 +78,7 @@ namespace Aika {
         /// <returns>
         /// A new <see cref="StateSet"/>.
         /// </returns>
-        Task<StateSet> CreateStateSet(ClaimsIdentity identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken);
+        Task<StateSet> CreateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -91,7 +91,7 @@ namespace Aika {
         /// <returns>
         /// The updated <see cref="StateSet"/>.
         /// </returns>
-        Task<StateSet> UpdateStateSet(ClaimsIdentity identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken);
+        Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -108,7 +108,7 @@ namespace Aika {
         /// state set <paramref name="name"/> does not exist.  Delete operations that fail due to 
         /// authorization issues should throw a <see cref="System.Security.SecurityException"/>.
         /// </remarks>
-        Task<bool> DeleteStateSet(ClaimsIdentity identity, string name, CancellationToken cancellationToken);
+        Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken);
 
     }
 }

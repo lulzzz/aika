@@ -21,7 +21,7 @@ namespace Aika {
         /// <returns>
         /// A dictionary that maps from tag name to authorization result.
         /// </returns>
-        Task<IDictionary<string, bool>> CanWriteTagData(ClaimsIdentity identity, IEnumerable<string> tagNames, CancellationToken cancellationToken);
+        Task<IDictionary<string, bool>> CanWriteTagData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken);
 
     }
 }

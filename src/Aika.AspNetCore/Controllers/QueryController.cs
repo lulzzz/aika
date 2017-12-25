@@ -50,11 +50,9 @@ namespace Aika.AspNetCore.Controllers {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
-
-            var identity = (ClaimsIdentity) User.Identity;
-
+            
             try {
-                var result = await _historian.GetTags(identity, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.GetTags(User, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
                 return Ok(result.Select(x => new TagDefinitionDto(x)).ToArray()); // 200
             }
             catch (ArgumentException) {
@@ -112,10 +110,8 @@ namespace Aika.AspNetCore.Controllers {
         [Route("tags/statesets")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, StateSetDto>))]
         public async Task<IActionResult> GetStateSets(CancellationToken cancellationToken) {
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.GetStateSets(identity, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.GetStateSets(User, cancellationToken).ConfigureAwait(false);
                 return Ok(result.Values.OrderBy(x => x.Name).ToDictionary(x => x.Name, x => new StateSetDto(x))); // 200
             }
             catch (ArgumentException) {
@@ -148,10 +144,8 @@ namespace Aika.AspNetCore.Controllers {
         [Route("tags/statesets/{name}")]
         [ProducesResponseType(200, Type = typeof(StateSetDto))]
         public async Task<IActionResult> GetStateSet([FromRoute] string name, CancellationToken cancellationToken) {
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.GetStateSet(identity, name, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.GetStateSet(User, name, cancellationToken).ConfigureAwait(false);
                 if (result == null) {
                     return NotFound(); // 404
                 }
@@ -191,10 +185,8 @@ namespace Aika.AspNetCore.Controllers {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.ReadSnapshotData(identity, request.Tags, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.ReadSnapshotData(User, request.Tags, cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToDictionary(x => x.Key, x => new TagValueDto(x.Value))); // 200
             }
             catch (ArgumentException) {
@@ -252,10 +244,8 @@ namespace Aika.AspNetCore.Controllers {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
-                var result = await _historian.ReadRawData(identity, request.Tags, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.PointCount, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.ReadRawData(User, request.Tags, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.PointCount, cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToDictionary(x => x.Key, x => new HistoricalTagValuesDto(x.Value))); // 200
             }
             catch (ArgumentException) {
@@ -319,12 +309,10 @@ namespace Aika.AspNetCore.Controllers {
                 return BadRequest(ModelState); // 400
             }
 
-            var identity = (ClaimsIdentity) User.Identity;
-
             try {
                 var result = request.SampleInterval != null
-                    ? await _historian.ReadProcessedData(identity, request.Tags, request.Function, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.SampleInterval.ToTimeSpan(), cancellationToken).ConfigureAwait(false)
-                    : await _historian.ReadProcessedData(identity, request.Tags, request.Function, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.PointCount.Value, cancellationToken).ConfigureAwait(false);
+                    ? await _historian.ReadProcessedData(User, request.Tags, request.Function, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.SampleInterval.ToTimeSpan(), cancellationToken).ConfigureAwait(false)
+                    : await _historian.ReadProcessedData(User, request.Tags, request.Function, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.PointCount.Value, cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToDictionary(x => x.Key, x => new HistoricalTagValuesDto(x.Value))); // 200
             }
             catch (ArgumentException) {

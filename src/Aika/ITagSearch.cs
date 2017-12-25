@@ -21,7 +21,7 @@ namespace Aika {
         /// <returns>
         /// A collection of matching tags.
         /// </returns>
-        Task<IEnumerable<TagDefinition>> GetTags(ClaimsIdentity identity, TagDefinitionFilter filter, CancellationToken cancellationToken);
+        Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -33,7 +33,7 @@ namespace Aika {
         /// <returns>
         /// The definitions of the requested tags.
         /// </returns>
-        Task<IEnumerable<TagDefinition>> GetTags(ClaimsIdentity identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken);
+        Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -44,7 +44,7 @@ namespace Aika {
         /// <returns>
         /// The state sets defined by the historian, indexed by set name.
         /// </returns>
-        Task<IDictionary<string, StateSet>> GetStateSets(ClaimsIdentity identity, CancellationToken cancellationToken);
+        Task<IDictionary<string, StateSet>> GetStateSets(ClaimsPrincipal identity, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace Aika {
         /// <returns>
         /// The corresponding <see cref="StateSet"/>.
         /// </returns>
-        Task<StateSet> GetStateSet(ClaimsIdentity identity, string name, CancellationToken cancellationToken);
+        Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken);
 
     }
 }
