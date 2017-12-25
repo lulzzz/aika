@@ -47,8 +47,7 @@ namespace Aika.SampleApp {
             });
 
             app.UseMvc();
-
-            app.UseSignalR(x => x.MapHub<Aika.AspNetCore.Hubs.SnapshotHub>("aika/hubs/snapshot"));
+            app.UseSignalR(x => x.MapAikaHubs());
         }
 
 

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -31,6 +32,17 @@ namespace Aika.AspNetCore {
 
             builder.AddApplicationPart(typeof(ConfigurationExtensions).Assembly);
             return builder;
+        }
+
+
+        public static HubRouteBuilder MapAikaHubs(this HubRouteBuilder hubRouteBuilder) {
+            if (hubRouteBuilder == null) {
+                throw new ArgumentNullException(nameof(hubRouteBuilder));
+            }
+
+            hubRouteBuilder.MapHub<Hubs.SnapshotHub>("aika/hubs/snapshot");
+
+            return hubRouteBuilder;
         }
 
     }
