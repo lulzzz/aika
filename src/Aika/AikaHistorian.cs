@@ -498,6 +498,33 @@ namespace Aika {
             return result;
         }
 
+
+        /// <summary>
+        /// Creates a new snapshot subscription.
+        /// </summary>
+        /// <param name="identity">The identity that the subscription will be associated with.</param>
+        /// <returns>
+        /// A new <see cref="SnapshotSubscription"/> object.  It is important that this subscription 
+        /// object is not shared between multiple identities, as all subscribers to the 
+        /// <see cref="SnapshotSubscription.ValuesReceived"/> event will receive snapshot value 
+        /// changes as they occur.
+        /// </returns>
+        public SnapshotSubscription CreateSnapshotSubscription(ClaimsIdentity identity) {
+            if (_dataReader == null) {
+                throw new NotSupportedException();
+            }
+
+            if (identity == null) {
+                throw new ArgumentNullException(nameof(identity));
+            }
+
+            if (!IsInRole(identity, Roles.ReadTagData, true)) {
+                throw new SecurityException("Not authorized to read tag data.");
+            }
+
+            return new SnapshotSubscription(this);
+        }
+
         #endregion
 
         #region [ Tag Data Writes ]

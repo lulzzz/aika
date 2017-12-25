@@ -28,6 +28,7 @@ namespace Aika.SampleApp {
                 x.SerializerSettings.Formatting = Newtonsoft.Json.Formatting.Indented;
                 x.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
             });
+            services.AddSignalR(x => x.JsonSerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter()));
         }
 
 
@@ -46,6 +47,8 @@ namespace Aika.SampleApp {
             });
 
             app.UseMvc();
+
+            app.UseSignalR(x => x.MapHub<Aika.AspNetCore.Hubs.SnapshotHub>("aika/hubs/snapshot"));
         }
 
 
@@ -103,20 +106,20 @@ namespace Aika.SampleApp {
 
                 for (var sampleTime = start; sampleTime <= now; sampleTime = sampleTime.Add(TimeSpan.FromMinutes(1))) {
                     var value = waveFunc(sampleTime.Ticks, wavePeriod, 50);
-                    samples.Add(new TagValue(sampleTime, value, value.ToString(), TagValueQuality.Good, null));
+                    samples.Add(new TagValue(sampleTime, value, null, TagValueQuality.Good, null));
                 }
 
-                await historian.WriteTagData(identity, new Dictionary<string, IEnumerable<TagValue>>() { { tag.Name, samples } }, ct).ConfigureAwait(false);
+                await historian.InsertTagData(identity, new Dictionary<string, IEnumerable<TagValue>>() { { tag.Name, samples } }, ct).ConfigureAwait(false);
 
                 do {
-                    await Task.Delay(TimeSpan.FromMinutes(1), ct).ConfigureAwait(false);
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);
                     if (ct.IsCancellationRequested) {
                         break;
                     }
 
                     var sampleTime = DateTime.UtcNow;
                     var value = waveFunc(sampleTime.Ticks, wavePeriod, 50);
-                    var snapshot = new TagValue(sampleTime, value, value.ToString(), TagValueQuality.Good, null);
+                    var snapshot = new TagValue(sampleTime, value, null, TagValueQuality.Good, null);
 
                     taskRunner.RunBackgroundTask(ct2 => historian.WriteTagData(identity, new Dictionary<string, IEnumerable<TagValue>>() { { tag.Name, new[] { snapshot } } }, ct2));
                 }
