@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Aika;
 
-namespace Aika.AspNetCore.Models.Query {
+namespace Aika.AspNetCore.Models {
 
     /// <summary>
     /// Web API model for a historical data query response.

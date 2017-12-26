@@ -3,14 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Aika.AspNetCore.Models.Info
-{
+namespace Aika.AspNetCore.Models {
 
     /// <summary>
     /// Describes extended information about the Aika historian.
     /// </summary>
-    public class AikaInfoExtendedDto : AikaInfoDto
-    {
+    public class AikaInfoExtendedDto : AikaInfoDto {
 
         /// <summary>
         /// Gets or sets information about the underlying historian.
@@ -29,8 +27,8 @@ namespace Aika.AspNetCore.Models.Info
         /// </summary>
         /// <param name="historian">The <see cref="IHistorian"/> to create the <see cref="Historian"/> information from.</param>
         internal AikaInfoExtendedDto(IHistorian historian) : this() {
-            Historian = historian == null 
-                ? null 
+            Historian = historian == null
+                ? null
                 : new HistorianInfoDto(historian);
         }
 

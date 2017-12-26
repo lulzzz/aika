@@ -80,29 +80,6 @@ namespace Aika {
 
 
         /// <summary>
-        /// Tests if the calling identity is in the specified role.
-        /// </summary>
-        /// <param name="identity">The identity.</param>
-        /// <param name="roleName">The role.</param>
-        /// <param name="throwIfIdentityIsNull">
-        ///   When <see langword="true"/>, an <see cref="ArgumentNullException"/> will be thrown if 
-        ///   <paramref name="identity"/> is <see langword="null"/>.  When <see langword="false"/>, a 
-        ///   <see langword="null"/> <paramref name="identity"/> will result in a <see langword="true"/> 
-        ///   return value.
-        /// </param>
-        /// <returns>
-        /// A flag that indicates if the <paramref name="identity"/> is in the specified role.
-        /// </returns>
-        private static bool IsInRole(ClaimsPrincipal identity, string roleName, bool throwIfIdentityIsNull) {
-            if (identity == null && throwIfIdentityIsNull) {
-                throw new ArgumentNullException(nameof(identity));
-            }
-
-            return identity?.IsInRole(roleName) ?? true;
-        }
-
-
-        /// <summary>
         /// Waits for a task to complete, but immediately cancels as soon as the specified <see cref="CancellationToken"/> fires.
         /// </summary>
         /// <typeparam name="T">The return type of the task.</typeparam>
@@ -251,10 +228,6 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            if (!IsInRole(identity, Roles.ReadTagData, true)) {
-                throw new SecurityException("Not authorized to read tag data.");
-            }
-
             if (tagNames == null) {
                 throw new ArgumentNullException(nameof(tagNames));
             }
@@ -320,10 +293,6 @@ namespace Aika {
         private async Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
-            }
-
-            if (!IsInRole(identity, Roles.ReadTagData, true)) {
-                throw new SecurityException("Not authorized to read tag data.");
             }
 
             if (tagNames == null) {
@@ -463,10 +432,6 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            if (!IsInRole(identity, Roles.ReadTagData, true)) {
-                throw new SecurityException("Not authorized to read tag data.");
-            }
-
             if (tagNames == null) {
                 throw new ArgumentNullException(nameof(tagNames));
             }
@@ -518,10 +483,6 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            if (!IsInRole(identity, Roles.ReadTagData, true)) {
-                throw new SecurityException("Not authorized to read tag data.");
-            }
-
             return new SnapshotSubscription(this);
         }
 
@@ -557,10 +518,6 @@ namespace Aika {
 
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
-            }
-
-            if (!IsInRole(identity, Roles.WriteTagData, true)) {
-                throw new SecurityException("Not authorized to write tag data.");
             }
 
             if (values == null) {
@@ -642,10 +599,6 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            if (!IsInRole(identity, Roles.WriteTagData, true)) {
-                throw new SecurityException("Not authorized to write tag data.");
-            }
-
             if (values == null) {
                 throw new ArgumentNullException(nameof(values));
             }
@@ -694,10 +647,6 @@ namespace Aika {
                 throw new NotSupportedException();
             }
 
-            if (!IsInRole(identity, Roles.ManageTags, true)) {
-                throw new SecurityException("Not authorized to manage tags.");
-            }
-
             return await _tagManager.GetTagCount(identity, cancellationToken).ConfigureAwait(false);
         }
 
@@ -731,10 +680,6 @@ namespace Aika {
                 throw new NotSupportedException();
             }
 
-            if (!IsInRole(identity, Roles.ManageTags, true)) {
-                throw new SecurityException("Not authorized to manage tags.");
-            }
-
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
             }
@@ -764,10 +709,6 @@ namespace Aika {
                 throw new NotSupportedException();
             }
 
-            if (!IsInRole(identity, Roles.ManageTags, true)) {
-                throw new SecurityException("Not authorized to manage tags.");
-            }
-
             if (String.IsNullOrWhiteSpace(tagId)) {
                 throw new ArgumentException("You must specify a tag ID.", nameof(tagId));
             }
@@ -791,10 +732,6 @@ namespace Aika {
         public async Task<bool> DeleteTag(ClaimsPrincipal identity, string tagIdOrName, CancellationToken cancellationToken) {
             if (_tagManager == null) {
                 throw new NotSupportedException();
-            }
-
-            if (!IsInRole(identity, Roles.ManageTags, true)) {
-                throw new SecurityException("Not authorized to manage tags.");
             }
 
             if (String.IsNullOrWhiteSpace(tagIdOrName)) {
@@ -831,10 +768,6 @@ namespace Aika {
                 throw new NotSupportedException();
             }
 
-            if (!IsInRole(identity, Roles.ManageTags, true)) {
-                throw new SecurityException("Not authorized to manage tags.");
-            }
-
             if (String.IsNullOrWhiteSpace(name)) {
                 throw new ArgumentException("You must specify a state set name.", nameof(name));
             }
@@ -854,10 +787,6 @@ namespace Aika {
                 throw new NotSupportedException();
             }
 
-            if (!IsInRole(identity, Roles.ManageTags, true)) {
-                throw new SecurityException("Not authorized to manage tags.");
-            }
-
             if (String.IsNullOrWhiteSpace(name)) {
                 throw new ArgumentException("You must specify a state set name.", nameof(name));
             }
@@ -875,10 +804,6 @@ namespace Aika {
         public async Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
             if (_tagManager == null) {
                 throw new NotSupportedException();
-            }
-
-            if (!IsInRole(identity, Roles.ManageTags, true)) {
-                throw new SecurityException("Not authorized to manage tags.");
             }
 
             if (String.IsNullOrWhiteSpace(name)) {

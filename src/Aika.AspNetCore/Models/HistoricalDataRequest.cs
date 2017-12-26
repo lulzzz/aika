@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Aika.AspNetCore.Models.Query {
+namespace Aika.AspNetCore.Models {
 
     /// <summary>
     /// Base class that tag data request objects inherit from.

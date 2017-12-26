@@ -6,7 +6,6 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Aika.AspNetCore.Models;
-using Aika.AspNetCore.Models.Query;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,7 +15,7 @@ namespace Aika.AspNetCore.Controllers {
     /// API controller for performing tag data queries.
     /// </summary>
     [Route("aika/api/[controller]")]
-    [Authorize(Roles = Aika.Roles.ReadTagData)]
+    [Authorize(Policy = Authorization.Scopes.ReadTagData)]
     public class QueryController : Controller {
 
         /// <summary>

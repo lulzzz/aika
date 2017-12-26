@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
-using Aika;
-using Aika.AspNetCore.Models.Query;
 
-namespace Aika.AspNetCore.Models.Write {
+namespace Aika.AspNetCore.Models {
 
     /// <summary>
     /// Describes an API data write request.

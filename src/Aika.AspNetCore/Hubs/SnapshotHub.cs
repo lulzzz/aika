@@ -13,7 +13,7 @@ namespace Aika.AspNetCore.Hubs {
     /// <summary>
     /// SignalR hub for pushing real-time value changes to subscribers.
     /// </summary>
-    [Authorize(Roles = Roles.ReadTagData)]
+    [Authorize(Policy = Authorization.Scopes.ReadTagData)]
     public class SnapshotHub : Hub {
 
         /// <summary>

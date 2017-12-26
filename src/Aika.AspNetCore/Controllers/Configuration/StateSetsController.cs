@@ -5,7 +5,7 @@ using System.Security;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models.Query;
+using Aika.AspNetCore.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
     /// API controller for managing the state sets available to historian tags.
     /// </summary>
     [Route("aika/api/configuration/[controller]")]
-    [Authorize(Roles = Aika.Roles.ManageTags)]
+    [Authorize(Policy = Authorization.Scopes.ManageTags)]
     public class StateSetsController : Controller {
 
         /// <summary>

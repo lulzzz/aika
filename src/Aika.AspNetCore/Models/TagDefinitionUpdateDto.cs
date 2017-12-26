@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models.Query;
 
-namespace Aika.AspNetCore.Models.Tags {
+
+namespace Aika.AspNetCore.Models {
     /// <summary>
     /// Describes an update to a tag definition.
     /// </summary>

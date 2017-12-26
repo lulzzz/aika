@@ -4,8 +4,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Aika.AspNetCore
-{
+namespace Aika.AspNetCore {
     /// <summary>
     /// Extension methods for parsing absolute and relative time stamps, and sample intervals.
     /// </summary>
@@ -170,12 +169,10 @@ namespace Aika.AspNetCore
 
 
         /// <summary>
-        /// Converts an absolute or relative time stamp string into a <see cref="DateTime"/> instance.
+        /// Converts an absolute or relative time stamp string into a UTC <see cref="DateTime"/> instance.
         /// </summary>
         /// <param name="s">The <see cref="string"/> to convert.</param>
-        /// <param name="baseDate">The base <see cref="DateTime"/> to use when a relative time stamp is specified.</param>
         /// <param name="formatProvider">The <see cref="IFormatProvider"/> to use when parsing absolute dates.</param>
-        /// <param name="dateTimeStyle">The <see cref="System.Globalization.DateTimeStyles"/> to use while parsing dates.</param>
         /// <returns>A <see cref="DateTime"/> representing the time stamp string.</returns>
         /// <exception cref="FormatException">The string is not a valid absolute or relative time stamp.</exception>
         /// <remarks>
@@ -222,12 +219,15 @@ namespace Aika.AspNetCore
         /// </para>
         /// 
         /// </remarks>
-        public static DateTime ToDateTime(this string s, DateTime baseDate, IFormatProvider formatProvider, DateTimeStyles dateTimeStyle) {
+        public static DateTime ToUtcDateTime(this string s, IFormatProvider formatProvider) {
             if (String.IsNullOrWhiteSpace(s)) {
                 throw new FormatException("Invalid time stamp.");
             }
 
             Match m;
+
+            var baseDate = DateTime.UtcNow;
+            var dateTimeStyle = DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal;
 
             if (!IsDateTime(s, formatProvider, dateTimeStyle, out m)) {
                 throw new FormatException("Invalid time stamp.");
@@ -242,7 +242,9 @@ namespace Aika.AspNetCore
                 return DateTime.Parse(s, formatProvider, dateTimeStyle);
             }
 
-            if (!m.Groups["operator"].Success) return baseDate;
+            if (!m.Groups["operator"].Success) {
+                return baseDate;
+            }
 
             var difference = ToTimeSpan(m);
             if (m.Groups["operator"].Value == "-") {
@@ -250,283 +252,6 @@ namespace Aika.AspNetCore
             }
 
             return baseDate.Add(difference);
-        }
-
-
-        /// <summary>
-        /// Attempts to parse the specified absolute or relative time stamp literal into a <see cref="DateTime"/> instance using the specified settings.
-        /// </summary>
-        /// <param name="s">The time stamp literal.</param>
-        /// <param name="baseDate">The base date to use when parsing a relative time stamp.</param>
-        /// <param name="formatProvider">The <see cref="IFormatProvider"/> to use when parsing absolute dates.</param>
-        /// <param name="dateTimeStyle">The <see cref="System.Globalization.DateTimeStyles"/> to use while parsing dates.</param>
-        /// <param name="dateTime">The parsed date.</param>
-        /// <returns>
-        /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
-        /// </returns>
-        public static bool TryConvertToDateTime(this string s, DateTime baseDate, IFormatProvider formatProvider, DateTimeStyles dateTimeStyle, out DateTime dateTime) {
-            try {
-                dateTime = ToDateTime(s, baseDate, formatProvider, dateTimeStyle);
-                return true;
-            }
-            catch {
-                dateTime = default(DateTime);
-                return false;
-            }
-        }
-
-
-        /// <summary>
-        /// Converts an absolute or relative time stamp string into a <see cref="DateTime"/> instance.
-        /// </summary>
-        /// <param name="s">The <see cref="string"/> to convert.</param>
-        /// <param name="formatProvider">An optional <see cref="IFormatProvider"/> to use when parsing absolute dates.</param>
-        /// <param name="dateTimeStyle">An optional <see cref="System.Globalization.DateTimeStyles"/> instance specifying flags to use while parsing dates.</param>
-        /// <returns>A <see cref="DateTime"/> representing the time stamp string.</returns>
-        /// <exception cref="FormatException">The string is not a valid absolute or relative time stamp.</exception>
-        /// <remarks>
-        /// Relative time stamps are specified in the format <c>* - [duration][unit]</c> or <c>* + [duration][unit]</c> 
-        /// where <c>*</c> represents the current time, <c>[duration]</c> is a number greater than or equal to zero and 
-        /// <c>[unit]</c> is the unit that the duration is measured in.  Integer and floating point durations are both 
-        /// valid.  The following units are valid:
-        /// 
-        /// <list type="table">
-        ///     <listheader>
-        ///         <term>Unit</term>
-        ///         <description>Description</description>
-        ///     </listheader>
-        ///     <item>
-        ///         <term>ms</term>
-        ///         <description>milliseconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>s</term>
-        ///         <description>seconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>m</term>
-        ///         <description>minutes</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>h</term>
-        ///         <description>hours</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>d</term>
-        ///         <description>days</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>y</term>
-        ///         <description>years (1y == 365d)</description>
-        ///     </item>
-        /// </list>
-        /// 
-        /// Note that all units are case insensitive and white space in the string is ignored.
-        /// 
-        /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
-        /// </para>
-        /// 
-        /// <para>
-        /// If a relative time stamp is specified, <paramref name="dateTimeStyle"/> is used to 
-        /// determine the meaning of <c>*</c>: if <paramref name="dateTimeStyle"/> includes the 
-        /// <see cref="System.Globalization.DateTimeStyles.AssumeUniversal"/> flag, <c>*</c> 
-        /// will be assumed to mean <see cref="DateTime.UtcNow"/>.  Otherwise, <c>*</c> will 
-        /// be interpreted as meaning <see cref="DateTime.Now"/>.
-        /// </para>
-        /// 
-        /// </remarks>
-        public static DateTime ToDateTime(this string s, IFormatProvider formatProvider, DateTimeStyles dateTimeStyle) {
-            return ToDateTime(s, dateTimeStyle.HasFlag(DateTimeStyles.AssumeUniversal) ? DateTime.UtcNow : DateTime.Now, formatProvider, dateTimeStyle);
-        }
-
-
-        /// <summary>
-        /// Attempts to parse the specified absolute or relative time stamp literal into a <see cref="DateTime"/> 
-        /// instance using the specified settings.
-        /// </summary>
-        /// <param name="s">The time stamp literal.</param>
-        /// <param name="formatProvider">The <see cref="IFormatProvider"/> to use when parsing absolute dates.</param>
-        /// <param name="dateTimeStyle">The <see cref="DateTimeStyles"/> to use while parsing dates.</param>
-        /// <param name="dateTime">The parsed date.</param>
-        /// <returns>
-        /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
-        /// </returns>
-        /// <remarks>
-        /// Relative time stamps are specified in the format <c>* - [duration][unit]</c> or <c>* + [duration][unit]</c> 
-        /// where <c>*</c> represents the current time, <c>[duration]</c> is a number greater than or equal to zero and 
-        /// <c>[unit]</c> is the unit that the duration is measured in.  Integer and floating point durations are both 
-        /// valid.  The following units are valid:
-        /// 
-        /// <list type="table">
-        ///     <listheader>
-        ///         <term>Unit</term>
-        ///         <description>Description</description>
-        ///     </listheader>
-        ///     <item>
-        ///         <term>ms</term>
-        ///         <description>milliseconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>s</term>
-        ///         <description>seconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>m</term>
-        ///         <description>minutes</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>h</term>
-        ///         <description>hours</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>d</term>
-        ///         <description>days</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>y</term>
-        ///         <description>years (1y == 365d)</description>
-        ///     </item>
-        /// </list>
-        /// 
-        /// Note that all units are case insensitive and white space in the string is ignored.
-        /// 
-        /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
-        /// </para>
-        /// 
-        /// </remarks>
-        public static bool TryConvertToDateTime(this string s, IFormatProvider formatProvider, DateTimeStyles dateTimeStyle, out DateTime dateTime) {
-            try {
-                dateTime = ToDateTime(s, formatProvider, dateTimeStyle);
-                return true;
-            }
-            catch {
-                dateTime = default(DateTime);
-                return false;
-            }
-        }
-
-
-        /// <summary>
-        /// Converts an absolute or relative time stamp string into a <see cref="DateTime"/> instance.
-        /// </summary>
-        /// <param name="s">The <see cref="string"/> to convert.</param>
-        /// <param name="baseDate">The base <see cref="DateTime"/> to use when a relative time stamp is specified.</param>
-        /// <returns>A <see cref="DateTime"/> representing the time stamp string.</returns>
-        /// <exception cref="FormatException">The string is not a valid absolute or relative time stamp.</exception>
-        /// <remarks>
-        /// Relative time stamps are specified in the format <c>* - [duration][unit]</c> or <c>* + [duration][unit]</c> 
-        /// where <c>*</c> represents the current time, <c>[duration]</c> is a number greater than or equal to zero and 
-        /// <c>[unit]</c> is the unit that the duration is measured in.  Integer and floating point durations are both 
-        /// valid.  The following units are valid:
-        /// 
-        /// <list type="table">
-        ///     <listheader>
-        ///         <term>Unit</term>
-        ///         <description>Description</description>
-        ///     </listheader>
-        ///     <item>
-        ///         <term>ms</term>
-        ///         <description>milliseconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>s</term>
-        ///         <description>seconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>m</term>
-        ///         <description>minutes</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>h</term>
-        ///         <description>hours</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>d</term>
-        ///         <description>days</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>y</term>
-        ///         <description>years (1y == 365d)</description>
-        ///     </item>
-        /// </list>
-        /// 
-        /// Note that all units are case insensitive and white space in the string is ignored.
-        /// 
-        /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
-        /// </para>
-        /// 
-        /// </remarks>
-        public static DateTime ToDateTime(this string s, DateTime baseDate) {
-            return ToDateTime(s, baseDate, null, DateTimeStyles.None);
-        }
-
-
-        /// <summary>
-        /// Attempts to parse the specified absolute or relative time stamp literal into a <see cref="DateTime"/> 
-        /// instance using the specified settings.
-        /// </summary>
-        /// <param name="s">The time stamp literal.</param>
-        /// <param name="baseDate">The base date to use when parsing a relative time stamp.</param>
-        /// <param name="dateTime">The parsed date.</param>
-        /// <returns>
-        /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
-        /// </returns>
-        /// <remarks>
-        /// Relative time stamps are specified in the format <c>* - [duration][unit]</c> or <c>* + [duration][unit]</c> 
-        /// where <c>*</c> represents the current time, <c>[duration]</c> is a number greater than or equal to zero and 
-        /// <c>[unit]</c> is the unit that the duration is measured in.  Integer and floating point durations are both 
-        /// valid.  The following units are valid:
-        /// 
-        /// <list type="table">
-        ///     <listheader>
-        ///         <term>Unit</term>
-        ///         <description>Description</description>
-        ///     </listheader>
-        ///     <item>
-        ///         <term>ms</term>
-        ///         <description>milliseconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>s</term>
-        ///         <description>seconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>m</term>
-        ///         <description>minutes</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>h</term>
-        ///         <description>hours</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>d</term>
-        ///         <description>days</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>y</term>
-        ///         <description>years (1y == 365d)</description>
-        ///     </item>
-        /// </list>
-        /// 
-        /// Note that all units are case insensitive and white space in the string is ignored.
-        /// 
-        /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
-        /// </para>
-        /// 
-        /// </remarks>
-        public static bool TryConvertToDateTime(this string s, DateTime baseDate, out DateTime dateTime) {
-            try {
-                dateTime = ToDateTime(s, baseDate);
-                return true;
-            }
-            catch {
-                dateTime = default(DateTime);
-                return false;
-            }
         }
 
 
@@ -584,15 +309,39 @@ namespace Aika.AspNetCore
         /// </para>
         /// 
         /// </remarks>
-        public static DateTime ToDateTime(this string s) {
-            return ToDateTime(s, DateTime.Now);
+        public static DateTime ToUtcDateTime(this string s) {
+            return ToUtcDateTime(s, null);
         }
 
 
         /// <summary>
-        /// Attempts to parse the specified absolute or relative time stamp literal into a <see cref="DateTime"/> instance using the specified settings.
+        /// Attempts to parse the specified absolute or relative time stamp literal into a UTC <see cref="DateTime"/> instance using the specified settings.
         /// </summary>
         /// <param name="s">The time stamp literal.</param>
+        /// <param name="baseDate">The base date to use when parsing a relative time stamp.</param>
+        /// <param name="formatProvider">The <see cref="IFormatProvider"/> to use when parsing absolute dates.</param>
+        /// <param name="dateTime">The parsed date.</param>
+        /// <returns>
+        /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
+        /// </returns>
+        public static bool TryConvertToUtcDateTime(this string s, IFormatProvider formatProvider, out DateTime dateTime) {
+            try {
+                dateTime = ToUtcDateTime(s, formatProvider);
+                return true;
+            }
+            catch {
+                dateTime = default(DateTime);
+                return false;
+            }
+        }
+
+
+        /// <summary>
+        /// Attempts to parse the specified absolute or relative time stamp literal into a <see cref="DateTime"/> 
+        /// instance using the specified settings.
+        /// </summary>
+        /// <param name="s">The time stamp literal.</param>
+        /// <param name="baseDate">The base date to use when parsing a relative time stamp.</param>
         /// <param name="dateTime">The parsed date.</param>
         /// <returns>
         /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
@@ -641,258 +390,15 @@ namespace Aika.AspNetCore
         /// </para>
         /// 
         /// </remarks>
-        public static bool TryConvertToDateTime(this string s, out DateTime dateTime) {
+        public static bool TryConvertToUtcDateTime(this string s, out DateTime dateTime) {
             try {
-                dateTime = ToDateTime(s);
+                dateTime = ToUtcDateTime(s, null);
                 return true;
             }
             catch {
                 dateTime = default(DateTime);
                 return false;
             }
-        }
-
-
-        /// <summary>
-        /// Converts an absolute or relative time stamp string into a UTC <see cref="DateTime"/> instance.
-        /// </summary>
-        /// <param name="s">The <see cref="string"/> to convert.</param>
-        /// <param name="formatProvider">The format provider to use.</param>
-        /// <returns>A <see cref="DateTime"/> representing the time stamp string.</returns>
-        /// <exception cref="FormatException">The string is not a valid absolute or relative time stamp.</exception>
-        /// <remarks>
-        /// Relative time stamps are specified in the format <c>* - [duration][unit]</c> or <c>* + [duration][unit]</c> 
-        /// where <c>*</c> represents the current time, <c>[duration]</c> is a number greater than or equal to zero and 
-        /// <c>[unit]</c> is the unit that the duration is measured in.  Integer and floating point durations are both 
-        /// valid.  The following units are valid:
-        /// 
-        /// <list type="table">
-        ///     <listheader>
-        ///         <term>Unit</term>
-        ///         <description>Description</description>
-        ///     </listheader>
-        ///     <item>
-        ///         <term>ms</term>
-        ///         <description>milliseconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>s</term>
-        ///         <description>seconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>m</term>
-        ///         <description>minutes</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>h</term>
-        ///         <description>hours</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>d</term>
-        ///         <description>days</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>y</term>
-        ///         <description>years (1y == 365d)</description>
-        ///     </item>
-        /// </list>
-        /// 
-        /// Note that all units are case insensitive and white space in the string is ignored.
-        /// 
-        /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
-        /// </para>
-        /// 
-        /// <para>
-        /// Relative time stamps will use <see cref="DateTime.UtcNow"/> as the base date.
-        /// </para>
-        /// 
-        /// </remarks>
-        public static DateTime ToUtcDateTime(this string s, IFormatProvider formatProvider) {
-            return s.ToDateTime(DateTime.UtcNow, formatProvider, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
-        }
-
-
-        /// <summary>
-        /// Converts an absolute or relative time stamp string into a UTC <see cref="DateTime"/> instance.
-        /// </summary>
-        /// <param name="s">The <see cref="string"/> to convert.</param>
-        /// <returns>A <see cref="DateTime"/> representing the time stamp string.</returns>
-        /// <exception cref="FormatException">The string is not a valid absolute or relative time stamp.</exception>
-        /// <remarks>
-        /// Relative time stamps are specified in the format <c>* - [duration][unit]</c> or <c>* + [duration][unit]</c> 
-        /// where <c>*</c> represents the current time, <c>[duration]</c> is a number greater than or equal to zero and 
-        /// <c>[unit]</c> is the unit that the duration is measured in.  Integer and floating point durations are both 
-        /// valid.  The following units are valid:
-        /// 
-        /// <list type="table">
-        ///     <listheader>
-        ///         <term>Unit</term>
-        ///         <description>Description</description>
-        ///     </listheader>
-        ///     <item>
-        ///         <term>ms</term>
-        ///         <description>milliseconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>s</term>
-        ///         <description>seconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>m</term>
-        ///         <description>minutes</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>h</term>
-        ///         <description>hours</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>d</term>
-        ///         <description>days</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>y</term>
-        ///         <description>years (1y == 365d)</description>
-        ///     </item>
-        /// </list>
-        /// 
-        /// Note that all units are case insensitive and white space in the string is ignored.
-        /// 
-        /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
-        /// </para>
-        /// 
-        /// <para>
-        /// Relative time stamps will use <see cref="DateTime.UtcNow"/> as the base date.
-        /// </para>
-        /// 
-        /// </remarks>
-        public static DateTime ToUtcDateTime(this string s) {
-            return s.ToUtcDateTime(null);
-        }
-
-
-        /// <summary>
-        /// Attempts to parse the specified absolute or relative time stamp literal into a UTC <see cref="DateTime"/> 
-        /// instance using the specified settings.
-        /// </summary>
-        /// <param name="s">The time stamp literal.</param>
-        /// <param name="formatProvider">The format provider to use.</param>
-        /// <param name="utcDateTime">The parsed UTC date.</param>
-        /// <returns>
-        /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
-        /// </returns>
-        /// <remarks>
-        /// Relative time stamps are specified in the format <c>* - [duration][unit]</c> or <c>* + [duration][unit]</c> 
-        /// where <c>*</c> represents the current time, <c>[duration]</c> is a number greater than or equal to zero and 
-        /// <c>[unit]</c> is the unit that the duration is measured in.  Integer and floating point durations are both 
-        /// valid.  The following units are valid:
-        /// 
-        /// <list type="table">
-        ///     <listheader>
-        ///         <term>Unit</term>
-        ///         <description>Description</description>
-        ///     </listheader>
-        ///     <item>
-        ///         <term>ms</term>
-        ///         <description>milliseconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>s</term>
-        ///         <description>seconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>m</term>
-        ///         <description>minutes</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>h</term>
-        ///         <description>hours</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>d</term>
-        ///         <description>days</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>y</term>
-        ///         <description>years (1y == 365d)</description>
-        ///     </item>
-        /// </list>
-        /// 
-        /// Note that all units are case insensitive and white space in the string is ignored.
-        /// 
-        /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
-        /// </para>
-        /// 
-        /// </remarks>
-        public static bool TryConvertToUtcDateTime(this string s, IFormatProvider formatProvider, out DateTime utcDateTime) {
-            try {
-                utcDateTime = ToDateTime(s, DateTime.UtcNow, formatProvider, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
-                return true;
-            }
-            catch {
-                utcDateTime = default(DateTime);
-                return false;
-            }
-        }
-
-
-        /// <summary>
-        /// Attempts to parse the specified absolute or relative time stamp literal into a UTC <see cref="DateTime"/> 
-        /// instance using the specified settings.
-        /// </summary>
-        /// <param name="s">The time stamp literal.</param>
-        /// <param name="utcDateTime">The parsed UTC date.</param>
-        /// <returns>
-        /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
-        /// </returns>
-        /// <remarks>
-        /// Relative time stamps are specified in the format <c>* - [duration][unit]</c> or <c>* + [duration][unit]</c> 
-        /// where <c>*</c> represents the current time, <c>[duration]</c> is a number greater than or equal to zero and 
-        /// <c>[unit]</c> is the unit that the duration is measured in.  Integer and floating point durations are both 
-        /// valid.  The following units are valid:
-        /// 
-        /// <list type="table">
-        ///     <listheader>
-        ///         <term>Unit</term>
-        ///         <description>Description</description>
-        ///     </listheader>
-        ///     <item>
-        ///         <term>ms</term>
-        ///         <description>milliseconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>s</term>
-        ///         <description>seconds</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>m</term>
-        ///         <description>minutes</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>h</term>
-        ///         <description>hours</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>d</term>
-        ///         <description>days</description>
-        ///     </item>
-        ///     <item>
-        ///         <term>y</term>
-        ///         <description>years (1y == 365d)</description>
-        ///     </item>
-        /// </list>
-        /// 
-        /// Note that all units are case insensitive and white space in the string is ignored.
-        /// 
-        /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
-        /// </para>
-        /// 
-        /// </remarks>
-        public static bool TryConvertToUtcDateTime(this string s, out DateTime utcDateTime) {
-            return TryConvertToUtcDateTime(s, null, out utcDateTime);
         }
 
 

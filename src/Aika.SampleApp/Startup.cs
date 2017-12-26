@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Aika.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -11,28 +12,85 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Aika.SampleApp {
+
+    /// <summary>
+    /// ASP.NET Core startup class.
+    /// </summary>
     public class Startup {
+
+        /// <summary>
+        /// Environment variable that defines the JWT authority.
+        /// </summary>
+        private const string JwtAuthoritySetting = "AIKA_JWTAUTHORITY";
+
+        /// <summary>
+        /// Environment variable that defines the JWT audience.
+        /// </summary>
+        private const string JwtAudienceSetting = "AIKA_JWTAUDIENCE";
+
+        /// <summary>
+        /// Gets the configuration object.
+        /// </summary>
+        public IConfiguration Configuration { get; }
+
+
+        /// <summary>
+        /// Creates a new <see cref="Startup"/> object.
+        /// </summary>
+        /// <param name="configuration">The configuration object.</param>
         public Startup(IConfiguration configuration) {
             Configuration = configuration;
         }
 
-        public IConfiguration Configuration { get; }
 
-
-        // This method gets called by the runtime. Use this method to add services to the container.
+        /// <summary>
+        /// Configures application services.
+        /// </summary>
+        /// <param name="services">The container to add services to.</param>
         public void ConfigureServices(IServiceCollection services) {
             services.AddLogging(x => x.AddConsole().AddDebug());
-            services.AddAuthentication();
+
+            // Configure JWT authentication.
+            services.AddAuthentication(options => {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            }).AddJwtBearer(options => {
+                options.Authority = Configuration.GetValue<string>(JwtAuthoritySetting);
+                options.Audience = Configuration.GetValue<string>(JwtAudienceSetting);
+                // Allow SignalR websocket upgrades to be authenticated by putting the JWT in the 
+                // query string.
+                options.Events = new JwtBearerEvents() {
+                    OnMessageReceived = context => {
+                        if (context.Request.Path.Value.Contains("/aika/hubs/") && context.Request.Query.TryGetValue("token", out var value)) {
+                            context.Token = value;
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
+            });
+
+            // Configure authorization based on scopes in the JWTs.
+            services.AddAikaAuthorizationScopePolicies(Configuration.GetValue<string>(JwtAuthoritySetting));
+
+            // Register the Aika historian and the underlying implementation.
             services.AddAikaHistorian<Aika.Historians.InMemoryHistorian>();
+
+            // Add MVC and register the Aika-specific routes.
             services.AddMvc().AddAikaRoutes().AddJsonOptions(x => {
                 x.SerializerSettings.Formatting = Newtonsoft.Json.Formatting.Indented;
                 x.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
             });
+
+            // Add SignalR.
             services.AddSignalR(x => x.JsonSerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter()));
         }
 
 
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        /// <summary>
+        /// Configures the request pipeline.
+        /// </summary>
+        /// <param name="app">The application builder.</param>
+        /// <param name="env">The hosting envrionment.</param>
         public void Configure(IApplicationBuilder app, IHostingEnvironment env) {
             AddTestTagData(app.ApplicationServices);
 
@@ -40,29 +98,30 @@ namespace Aika.SampleApp {
                 app.UseDeveloperExceptionPage();
             }
 
-            // Middleware that adds all callers to all Aika roles.
-            app.Use((context, next) => {
-                context.User = new System.Security.Claims.ClaimsPrincipal(GetSystemIdentity());
-                return next();
-            });
+            app.UseAuthentication();
 
             app.UseMvc();
-            app.UseSignalR(x => x.MapAikaHubs());
+            app.UseSignalR(x => x.MapAikaHubs()); // Make sure that the Aika hubs are mapped.
         }
 
 
+        /// <summary>
+        /// Gets an internal identity that represents the Aika system account.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="System.Security.Claims.ClaimsPrincipal"/> that represents the Aika system 
+        /// account.
+        /// </returns>
         private System.Security.Claims.ClaimsPrincipal GetSystemIdentity() {
-            var identity = new System.Security.Claims.ClaimsIdentity("Aika");
-            identity.AddClaim(new System.Security.Claims.Claim(identity.NameClaimType, "AikaSystem"));
-            identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Roles.Administrator));
-            identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Roles.ManageTags));
-            identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Roles.ReadTagData));
-            identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Roles.WriteTagData));
-
+            var identity = new System.Security.Claims.ClaimsIdentity("AikaSystem");
             return new System.Security.Claims.ClaimsPrincipal(identity);
         }
 
 
+        /// <summary>
+        /// Creates test tag data and adds it to the Aika historian.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
         private void AddTestTagData(IServiceProvider serviceProvider) {
             var taskRunner = serviceProvider.GetService<ITaskRunner>();
             var historian = serviceProvider.GetService<AikaHistorian>();

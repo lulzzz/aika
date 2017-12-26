@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Aika.AspNetCore.Models.Info {
+namespace Aika.AspNetCore.Models {
     /// <summary>
     /// Provides information about the Aika historian.
     /// </summary>

@@ -3,13 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Aika.AspNetCore.Models.Info
-{
+namespace Aika.AspNetCore.Models {
     /// <summary>
     /// Descrribes the underlying <see cref="IHistorian"/> implementation being used by the Aika historian.
     /// </summary>
-    public class HistorianInfoDto
-    {
+    public class HistorianInfoDto {
 
         /// <summary>
         /// Gets or sets the type name of the <see cref="IHistorian"/> implementation.

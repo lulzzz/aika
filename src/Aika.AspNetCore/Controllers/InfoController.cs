@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models.Info;
+using Aika.AspNetCore.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -62,7 +62,7 @@ namespace Aika.AspNetCore.Controllers {
         /// </returns>
         [HttpGet]
         [Route("extended")]
-        [Authorize(Roles = Roles.Administrator)]
+        [Authorize(Policy = Authorization.Scopes.Administrator)]
         [ProducesResponseType(200, Type = typeof(AikaInfoDto))]
         public async Task<IActionResult> GetInfoExtended(CancellationToken cancellationToken) {
             var result = new AikaInfoExtendedDto(_historian.Historian) {

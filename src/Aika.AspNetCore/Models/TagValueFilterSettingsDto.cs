@@ -4,8 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Aika.AspNetCore.Models.Tags
-{
+namespace Aika.AspNetCore.Models {
     /// <summary>
     /// Describes the settings for an exception or compression filter for a tag.
     /// </summary>

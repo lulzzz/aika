@@ -5,7 +5,7 @@ using System.Security;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models.Tags;
+using Aika.AspNetCore.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
     /// API controller for managing historian tags.
     /// </summary>
     [Route("aika/api/configuration/[controller]")]
-    [Authorize(Roles = Aika.Roles.ManageTags)]
+    [Authorize(Policy = Authorization.Scopes.ManageTags)]
     public class TagsController : Controller {
 
         /// <summary>
@@ -81,7 +81,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         [HttpPost]
         [Route("search")]
         [ProducesResponseType(200, Type = typeof(IEnumerable<TagDefinitionExtendedDto>))]
-        public async Task<IActionResult> GetTags([FromBody] Models.Query.TagSearchRequest request, CancellationToken cancellationToken) {
+        public async Task<IActionResult> GetTags([FromBody] TagSearchRequest request, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }

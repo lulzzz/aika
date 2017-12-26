@@ -5,7 +5,7 @@ using System.Security;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models.Write;
+using Aika.AspNetCore.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,7 @@ namespace Aika.AspNetCore.Controllers {
     /// API controller for performing operations on the Aika data stream.
     /// </summary>
     [Route("aika/api/[controller]")]
-    [Authorize(Roles = Aika.Roles.WriteTagData)]
+    [Authorize(Policy = Authorization.Scopes.WriteTagData)]
     public class WriteController : Controller {
 
         /// <summary>

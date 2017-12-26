@@ -2,9 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models.Query;
 
-namespace Aika.AspNetCore.Models.Tags {
+
+namespace Aika.AspNetCore.Models {
+
+    /// <summary>
+    /// Describes an extended-detail tag definition.
+    /// </summary>
     public class TagDefinitionExtendedDto : TagDefinitionDto {
 
         /// <summary>

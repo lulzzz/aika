@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Aika.AspNetCore.Models.Write {
+namespace Aika.AspNetCore.Models {
 
     /// <summary>
     /// Describes the result of a write operation.
