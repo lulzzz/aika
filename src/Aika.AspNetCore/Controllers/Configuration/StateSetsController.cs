@@ -5,7 +5,7 @@ using System.Security;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models;
+using Aika.Client.Dto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -47,7 +47,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         public async Task<IActionResult> GetStateSets(CancellationToken cancellationToken) {
             try {
                 var result = await _historian.GetStateSets(User, cancellationToken).ConfigureAwait(false);
-                return Ok(result.Values.OrderBy(x => x.Name).ToDictionary(x => x.Name, x => new StateSetDto(x))); // 200
+                return Ok(result.Values.OrderBy(x => x.Name).ToDictionary(x => x.Name, x => x.ToStateSetDto())); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -84,7 +84,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 if (result == null) {
                     return NotFound(); // 404
                 }
-                return Ok(new StateSetDto(result)); // 200
+                return Ok(result.ToStateSetDto()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400

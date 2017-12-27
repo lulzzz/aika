@@ -19,7 +19,6 @@ namespace Aika
         /// </summary>
         public TagValueFilterSettings Settings { get; }
 
-
         /// <summary>
         /// Gets the most recent value that passed through the exception filter.  If  <see langword="null"/>, 
         /// the next value passed to the filter will always be considered to be exceptional.
@@ -28,6 +27,31 @@ namespace Aika
         /// Note that this property will be updated by the filter as incoming values are processed.
         /// </remarks>
         public TagValue LastExceptionValue { get; internal set; }
+
+        /// <summary>
+        /// The results of the processing that the exception filter performed on its 
+        /// most-recently-received value.
+        /// </summary>
+        private ExceptionFilterResult _lastResult;
+
+        /// <summary>
+        /// Gets the results of the processing that the exception filter performed on its 
+        /// most-recently-received value.
+        /// </summary>
+        public ExceptionFilterResult LastResult {
+            get { return _lastResult; }
+            set {
+                _lastResult = value;
+                if (_lastResult != null) {
+                    ValueProcessed?.Invoke(_lastResult);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Raised once an incoming value has been processed by the exception filter.
+        /// </summary>
+        public event Action<ExceptionFilterResult> ValueProcessed;
 
 
         /// <summary>

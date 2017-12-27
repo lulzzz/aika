@@ -5,7 +5,8 @@ using System.Security;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models;
+using Aika.Client;
+using Aika.Client.Dto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -52,7 +53,7 @@ namespace Aika.AspNetCore.Controllers {
             
             try {
                 var result = await _historian.GetTags(User, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
-                return Ok(result.Select(x => new TagDefinitionDto(x)).ToArray()); // 200
+                return Ok(result.Select(x => x.ToTagDefinitionDto()).ToArray()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -90,7 +91,7 @@ namespace Aika.AspNetCore.Controllers {
                 Units = units,
                 PageSize = pageSize,
                 Page = page,
-                Type = TagDefinitionFilterJoinType.And
+                Type = TagDefinitionFilterJoinType.And.ToString()
             };
 
             TryValidateModel(model);
@@ -111,7 +112,7 @@ namespace Aika.AspNetCore.Controllers {
         public async Task<IActionResult> GetStateSets(CancellationToken cancellationToken) {
             try {
                 var result = await _historian.GetStateSets(User, cancellationToken).ConfigureAwait(false);
-                return Ok(result.Values.OrderBy(x => x.Name).ToDictionary(x => x.Name, x => new StateSetDto(x))); // 200
+                return Ok(result.Values.OrderBy(x => x.Name).ToDictionary(x => x.Name, x => x.ToStateSetDto())); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -148,7 +149,7 @@ namespace Aika.AspNetCore.Controllers {
                 if (result == null) {
                     return NotFound(); // 404
                 }
-                return Ok(new StateSetDto(result)); // 200
+                return Ok(result.ToStateSetDto()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -186,7 +187,7 @@ namespace Aika.AspNetCore.Controllers {
 
             try {
                 var result = await _historian.ReadSnapshotData(User, request.Tags, cancellationToken).ConfigureAwait(false);
-                return Ok(result.ToDictionary(x => x.Key, x => new TagValueDto(x.Value))); // 200
+                return Ok(result.ToDictionary(x => x.Key, x => x.Value.ToTagValueDto())); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -245,7 +246,7 @@ namespace Aika.AspNetCore.Controllers {
 
             try {
                 var result = await _historian.ReadRawData(User, request.Tags, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.PointCount, cancellationToken).ConfigureAwait(false);
-                return Ok(result.ToDictionary(x => x.Key, x => new HistoricalTagValuesDto(x.Value))); // 200
+                return Ok(result.ToDictionary(x => x.Key, x => x.Value.ToHistoricalTagValuesDto())); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -312,7 +313,7 @@ namespace Aika.AspNetCore.Controllers {
                 var result = request.SampleInterval != null
                     ? await _historian.ReadProcessedData(User, request.Tags, request.Function, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.SampleInterval.ToTimeSpan(), cancellationToken).ConfigureAwait(false)
                     : await _historian.ReadProcessedData(User, request.Tags, request.Function, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.PointCount.Value, cancellationToken).ConfigureAwait(false);
-                return Ok(result.ToDictionary(x => x.Key, x => new HistoricalTagValuesDto(x.Value))); // 200
+                return Ok(result.ToDictionary(x => x.Key, x => x.Value.ToHistoricalTagValuesDto())); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400

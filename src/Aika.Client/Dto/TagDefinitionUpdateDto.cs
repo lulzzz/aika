@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 
 
-namespace Aika.AspNetCore.Models {
+namespace Aika.Client.Dto {
     /// <summary>
     /// Describes an update to a tag definition.
     /// </summary>
@@ -34,7 +34,7 @@ namespace Aika.AspNetCore.Models {
         /// Gets or sets the tag's data type.
         /// </summary>
         [Required]
-        public TagDataType DataType { get; set; }
+        public string DataType { get; set; }
 
         /// <summary>
         /// Gets or sets the name of the discrete state set to use for the tag, when <see cref="DataType"/> 
@@ -51,25 +51,6 @@ namespace Aika.AspNetCore.Models {
         /// Gets or sets the compression filter settings for the tag.
         /// </summary>
         public TagValueFilterSettingsDto CompressionFilterSettings { get; set; }
-
-
-        /// <summary>
-        /// Converts the object into a <see cref="TagDefinitionUpdate"/> object.
-        /// </summary>
-        /// <returns>
-        /// An equivalent <see cref="TagDefinitionUpdate"/> object.
-        /// </returns>
-        internal TagDefinitionUpdate ToTagDefinitionUpdate() {
-            return new TagDefinitionUpdate() {
-                Name = Name,
-                Description = Description,
-                Units = Units,
-                DataType = DataType,
-                StateSet = StateSet,
-                ExceptionFilterSettings = ExceptionFilterSettings?.ToTagValueFilterSettingsUpdate(),
-                CompressionFilterSettings = CompressionFilterSettings?.ToTagValueFilterSettingsUpdate()
-            };
-        }
 
     }
 }

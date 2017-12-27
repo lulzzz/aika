@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Aika;
 
-namespace Aika.AspNetCore.Models {
+namespace Aika.Client.Dto {
 
     /// <summary>
     /// Web API model for a historical data query response.
@@ -29,28 +29,7 @@ namespace Aika.AspNetCore.Models {
         /// * Query results for any historical query that does not use the <see cref="DataQueryFunction.Interpolated"/> 
         ///   or <see cref="DataQueryFunction.Plot"/>.
         /// </remarks>
-        public TagValueCollectionVisualizationHint VisualizationHint { get; set; }
-
-
-        /// <summary>
-        /// Creates a new <see cref="HistoricalTagValuesDto"/> object.
-        /// </summary>
-        public HistoricalTagValuesDto() { }
-
-
-        /// <summary>
-        /// Creates a new <see cref="HistoricalTagValuesDto"/> object using the specified <see cref="TagValueCollection"/> object.
-        /// </summary>
-        /// <param name="values">The <see cref="TagValueCollection"/> object to copy values from.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="values"/> is <see langword="null"/>.</exception>
-        internal HistoricalTagValuesDto(TagValueCollection values) : this() {
-            if (values == null) {
-                throw new ArgumentNullException(nameof(values));
-            }
-
-            Values = values.Values.Select(x => new TagValueDto(x)).ToArray();
-            VisualizationHint = values.VisualizationHint;
-        }
+        public string VisualizationHint { get; set; }
 
     }
 }

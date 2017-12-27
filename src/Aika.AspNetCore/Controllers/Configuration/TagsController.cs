@@ -5,7 +5,7 @@ using System.Security;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models;
+using Aika.Client.Dto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -88,7 +88,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
 
             try {
                 var result = await _historian.GetTags(User, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
-                return Ok(result.Select(x => new TagDefinitionExtendedDto(x)).ToArray()); // 200
+                return Ok(result.Select(x => x.ToTagDefinitionExtendedDto()).ToArray()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -130,7 +130,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 if (tag == null) {
                     return NotFound(id);
                 }
-                return Ok(new TagDefinitionExtendedDto(tag)); // 200
+                return Ok(tag.ToTagDefinitionExtendedDto()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -160,7 +160,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
 
             try {
                 var result = await _historian.CreateTag(User, tag, cancellationToken).ConfigureAwait(false);
-                return CreatedAtRoute("GetTagById", new { id = result.Id } ,new TagDefinitionExtendedDto(result)); // 200
+                return CreatedAtRoute("GetTagById", new { id = result.Id }, result.ToTagDefinitionExtendedDto()); // 201
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -190,7 +190,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
 
             try {
                 var result = await _historian.UpdateTag(User, id, tag, cancellationToken).ConfigureAwait(false);
-                return Ok(new TagDefinitionExtendedDto(result)); // 200
+                return Ok(result.ToTagDefinitionExtendedDto()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400

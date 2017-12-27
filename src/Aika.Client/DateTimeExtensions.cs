@@ -4,11 +4,11 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Aika.AspNetCore {
+namespace Aika.Client {
     /// <summary>
     /// Extension methods for parsing absolute and relative time stamps, and sample intervals.
     /// </summary>
-    internal static class DateTimeParsingExtensions {
+    public static class DateTimeParsingExtensions {
 
         /// <summary>
         /// Base regex pattern for matching time span literals.

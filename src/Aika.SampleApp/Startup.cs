@@ -141,13 +141,13 @@ namespace Aika.SampleApp {
                                                         ExceptionFilterSettings = new TagValueFilterSettingsUpdate() {
                                                             IsEnabled = true,
                                                             LimitType = TagValueFilterDeviationType.Absolute,
-                                                            Limit = 0.5,
+                                                            Limit = 0.1,
                                                             WindowSize = TimeSpan.FromDays(1)
                                                         },
                                                         CompressionFilterSettings = new TagValueFilterSettingsUpdate() {
                                                             IsEnabled = true,
                                                             LimitType = TagValueFilterDeviationType.Absolute,
-                                                            Limit = 0.75,
+                                                            Limit = 0.15,
                                                             WindowSize = TimeSpan.FromDays(1)
                                                         }
                                                     },
@@ -167,7 +167,7 @@ namespace Aika.SampleApp {
                     samples.Add(new TagValue(sampleTime, value, null, TagValueQuality.Good, null));
                 }
 
-                await historian.InsertTagData(identity, new Dictionary<string, IEnumerable<TagValue>>() { { tag.Name, samples } }, ct).ConfigureAwait(false);
+                await historian.WriteTagData(identity, new Dictionary<string, IEnumerable<TagValue>>() { { tag.Name, samples } }, ct).ConfigureAwait(false);
 
                 do {
                     await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);

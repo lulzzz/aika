@@ -328,7 +328,7 @@ namespace Aika {
                         ? _dataReader.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
                         : _dataReader.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
                 }
-                else if (Aggregation.AggregationUtility.IsSupportedFunction(dataFunction)) {
+                else if (AggregationUtility.IsSupportedFunction(dataFunction)) {
                     // For functions that are not supported by the underlying historian but are 
                     // supported by AggregationUtility, we'll request raw data and then perform 
                     // the aggregation here.
@@ -347,7 +347,7 @@ namespace Aika {
                     var queryStartTime = utcStartTime.Subtract(sampleInterval);
 
                     query = _dataReader.ReadRawData(identity, authorisedTagNames, queryStartTime, utcEndTime, 0, cancellationToken).ContinueWith(t => {
-                        var aggregator = new Aggregation.AggregationUtility(_loggerFactory);
+                        var aggregator = new AggregationUtility(_loggerFactory);
                         // We'll hint that PLOT and INTERP data can be interpolated on a chart, but 
                         // other functions should use trailing-edge transitions.
                         var visualizationHint = DataQueryFunction.Interpolated.Equals(dataFunction, StringComparison.OrdinalIgnoreCase) || DataQueryFunction.Plot.Equals(dataFunction, StringComparison.OrdinalIgnoreCase)

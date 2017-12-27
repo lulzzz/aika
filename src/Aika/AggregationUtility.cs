@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
-namespace Aika.Aggregation {
+namespace Aika {
     /// <summary>
     /// Performs aggregation on raw tag data.
     /// </summary>

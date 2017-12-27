@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Aika.AspNetCore\Aika.AspNetCore.csproj" />
+    <ProjectReference Include="..\Aika.Client\Aika.Client.csproj" />
     <ProjectReference Include="..\Aika.InMemoryHistorian\Aika.InMemoryHistorian.csproj" />
     <ProjectReference Include="..\Aika\Aika.csproj" />
   </ItemGroup>

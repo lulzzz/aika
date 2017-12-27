@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Aika;
 
-namespace Aika.AspNetCore.Models {
+namespace Aika.Client.Dto {
 
     /// <summary>
     /// Describes a tag value.
@@ -40,47 +40,12 @@ namespace Aika.AspNetCore.Models {
         /// <summary>
         /// Gets the quality state of the value.
         /// </summary>
-        public TagValueQuality Quality { get; set; }
+        public string Quality { get; set; }
 
         /// <summary>
         /// Gets the unit of measurement for the value.
         /// </summary>
         public string Units { get; }
-
-
-        /// <summary>
-        /// Creates a new <see cref="TagValueDto"/> object.
-        /// </summary>
-        public TagValueDto() { }
-
-
-        /// <summary>
-        /// Creates a new <see cref="TagValueDto"/> object using the specified <see cref="TagValue"/> as a template.
-        /// </summary>
-        /// <param name="value">The <see cref="TagValue"/> to copy from.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
-        internal TagValueDto(TagValue value) : this() {
-            if (value == null) {
-                throw new ArgumentNullException(nameof(value));
-            }
-
-            UtcSampleTime = value.UtcSampleTime;
-            NumericValue = value.NumericValue;
-            TextValue = value.TextValue;
-            Quality = value.Quality;
-            Units = value.Units;
-        }
-
-
-        /// <summary>
-        /// Converts the <see cref="TagValueDto"/> into a <see cref="TagValue"/> instance.
-        /// </summary>
-        /// <returns>
-        /// The equivalent <see cref="TagValue"/> instance.
-        /// </returns>
-        internal TagValue ToTagValue() {
-            return new TagValue(UtcSampleTime, NumericValue ?? Double.NaN, TextValue, Quality, Units);
-        }
 
     }
 }

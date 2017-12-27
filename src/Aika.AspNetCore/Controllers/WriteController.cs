@@ -5,7 +5,7 @@ using System.Security;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models;
+using Aika.Client.Dto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -51,7 +51,7 @@ namespace Aika.AspNetCore.Controllers {
 
             try {
                 var result = await _historian.WriteTagData(User, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
-                return Ok(result.ToDictionary(x => x.Key, x => new WriteTagValuesResultDto(x.Value))); // 200
+                return Ok(result.ToDictionary(x => x.Key, x => x.Value.ToWriteTagValuesResultDto())); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -89,7 +89,7 @@ namespace Aika.AspNetCore.Controllers {
             
             try {
                 var result = await _historian.InsertTagData(User, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
-                return Ok(result.ToDictionary(x => x.Key, x => new WriteTagValuesResultDto(x.Value))); // 200
+                return Ok(result.ToDictionary(x => x.Key, x => x.Value.ToWriteTagValuesResultDto())); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400

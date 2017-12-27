@@ -47,6 +47,31 @@ namespace Aika
         /// </remarks>
         public TagValue LastReceivedValue { get; internal set; }
 
+        /// <summary>
+        /// The results of the processing that the compression filter performed on its 
+        /// most-recently-received value.
+        /// </summary>
+        private CompressionFilterResult _lastResult;
+
+        /// <summary>
+        /// Gets the results of the processing that the compression filter performed on its 
+        /// most-recently-received value.
+        /// </summary>
+        public CompressionFilterResult LastResult {
+            get { return _lastResult; }
+            set {
+                _lastResult = value;
+                if (_lastResult != null) {
+                    ValueProcessed?.Invoke(_lastResult);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Raised once an incoming value has been processed by the compression filter.
+        /// </summary>
+        public event Action<CompressionFilterResult> ValueProcessed;
+
 
         /// <summary>
         /// Creates a new <see cref="CompressionFilterState"/> object.

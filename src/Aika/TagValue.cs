@@ -44,14 +44,11 @@ namespace Aika {
         /// <summary>
         /// Creates a new <see cref="TagValue"/> object.
         /// </summary>
-        /// <param name="tagName">The tag name.</param>
         /// <param name="utcSampleTime">The UTC sample time.</param>
         /// <param name="numericValue">The numeric value.</param>
         /// <param name="textValue">The text value.</param>
         /// <param name="quality">The quality status for the value.</param>
         /// <param name="units">The unit of measure for the tag value.</param>
-        /// <param name="notes">The ntoes associated with the value.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="tagName"/> is <see langword="null"/>.</exception>
         public TagValue(DateTime utcSampleTime, double numericValue, string textValue, TagValueQuality quality, string units) {
             UtcSampleTime = utcSampleTime;
             NumericValue = numericValue;

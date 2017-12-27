@@ -79,7 +79,7 @@ namespace Aika.AspNetCore.Hubs {
             if (subscription == null) {
                 return;
             }
-            await subscription.AddTags(Context.User, tagNames, CancellationToken.None).ConfigureAwait(false);
+            await subscription.AddTags(Context.User, tagNames, Context.Connection.ConnectionAbortedToken).ConfigureAwait(false);
         }
 
 
@@ -91,7 +91,7 @@ namespace Aika.AspNetCore.Hubs {
                 return;
             }
 
-            await subscription.RemoveTags(Context.User, tagNames, CancellationToken.None).ConfigureAwait(false);
+            await subscription.RemoveTags(Context.User, tagNames, Context.Connection.ConnectionAbortedToken).ConfigureAwait(false);
         }
 
     }

@@ -31,7 +31,7 @@ namespace Aika {
     /// The compression filter is used to determing when tag values should be written to a data archive 
     /// in order to maintain the correct shape for the snapshot values that have been received for a tag.  
     /// To receive notifications when the buffer determines that values should be archived, subscribe to 
-    /// the <see cref="CompressionFilterValueEmitted"/> event.
+    /// the <see cref="Archive"/> event.
     /// </para>
     /// 
     /// <para>
@@ -138,7 +138,7 @@ namespace Aika {
 
         /// <summary>
         /// Gets the compression filter settings for the buffer.  The compression filter is used to determine 
-        /// if a new value should be sent for archiving (via the <see cref="CompressionFilterValueEmitted"/> event).
+        /// if a new value should be sent for archiving (via the <see cref="Archive"/> event).
         /// </summary>
         public CompressionFilterState CompressionFilter { get; }
 
@@ -153,27 +153,13 @@ namespace Aika {
 
         /// <summary>
         /// Raised whenever the <see cref="DataFilter"/> receives a value that passes the 
-        /// exception filter tests.  The values passed to event handlers will be the received value, 
-        /// and the value that was scanned immediately before the received value, in time order.  
-        /// These values should be passed on to a snapshot data sink.
-        /// </summary>
-        public event Action<IEnumerable<DataBufferValueChange>> ExceptionFilterValueEmitted;
-
-        /// <summary>
-        /// Raised whenever the <see cref="DataFilter"/> receives a value that passes the 
         /// compression filter tests.  The values passed to event handlers will be values
         /// that should be written to a data archive.
         /// </summary>
         /// <remarks>
         /// 
         /// <para>
-        /// Note that not all values emitted by the <see cref="ExceptionFilterValueEmitted"/> event 
-        /// will be subsequently emitted by the <see cref="CompressionFilterValueEmitted"/> event, as 
-        /// the exception and compression filters may have different deviation settings.
-        /// </para>
-        /// 
-        /// <para>
-        /// Note also that, when the <see cref="CompressionFilterValueEmitted"/> event is raised, the 
+        /// Note also that, when the <see cref="Archive"/> event is raised, the 
         /// values emitted will be the two most-recently-received values *prior* to the value that 
         /// passed the compression filter.  The value that actually passed the filter might not ever 
         /// be sent for archiving itself, depending on the shape of the data that follows the 
@@ -181,7 +167,7 @@ namespace Aika {
         /// </para>
         /// 
         /// </remarks>
-        public event Action<IEnumerable<DataBufferValueChange>> CompressionFilterValueEmitted;
+        public event Action<IEnumerable<TagValue>> Archive;
 
         #endregion
 
@@ -213,18 +199,6 @@ namespace Aika {
         #region [ Event Helper Methods ]
 
         /// <summary>
-        /// Gets the value to display for a value change in log messages etc.
-        /// </summary>
-        /// <param name="value">The value change.</param>
-        /// <returns>
-        /// The value to display.
-        /// </returns>
-        private object GetSampleValueForDisplay(DataBufferValueChange value) {
-            return GetSampleValueForDisplay(value.Value);
-        }
-
-
-        /// <summary>
         /// Gets the value to display for a data sample in log messages etc.
         /// </summary>
         /// <param name="value">The data sample.</param>
@@ -237,64 +211,42 @@ namespace Aika {
 
 
         /// <summary>
-        /// Invokes the <see cref="ExceptionFilterValueEmitted"/> event using the provided values, and invokes the compression filter on the values.
+        /// Invokes the compression filter on the specified values.
         /// </summary>
-        /// <param name="values">The new snapshot values.</param>
-        private void OnExceptionFilterPassed(IEnumerable<DataBufferValueChange> values) {
-            var vals = values?.ToArray();
-            if (vals == null || vals.Length == 0) {
-                return;
-            }
-
-            // Raise the Snapshot event.
-            try {
-                if (ExceptionFilterValueEmitted != null) {
-                    if (CanLogDebug) {
-                        Log?.LogDebug($"[{Name}] New snapshot values will be sent to subscribers: [ {String.Join(", ", vals.Select(x => $"{GetSampleValueForDisplay(x)} @ {x.Value.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}"))} ]");
-                    }
-                    ExceptionFilterValueEmitted.Invoke(vals);
-                }
-            }
-            catch (Exception e) {
-                Log?.LogError($"[{Name}] An unhandled exception occurred while invoking {nameof(ExceptionFilterValueEmitted)} event handlers.", e);
-            }
-
+        /// <param name="values">The values.</param>
+        private void OnExceptionFilterPassed((TagValue value, string notes)[] values) {
             // Pass the values into the compression filter.
-            foreach (var value in vals) {
-                if (value == null) {
-                    continue;
-                }
-
+            foreach (var value in values) {
                 try {
-                    _compressionMonitor.ValueReceived(value.Value);
+                    _compressionMonitor.ValueReceived(value);
                 }
                 catch (Exception e) {
-                    Log?.LogError($"[{Name}] An unhandled exception occurred while invoking the compression filter.  The incoming value was: {GetSampleValueForDisplay(value)} @ {value.Value.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}", e);
+                    Log?.LogError($"[{Name}] An unhandled exception occurred while invoking the compression filter.  The incoming value was: {GetSampleValueForDisplay(value.value)} @ {value.value.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}", e);
                 }
             }
         }
 
 
         /// <summary>
-        /// Invokes the <see cref="CompressionFilterValueEmitted"/> event using the provided values.
+        /// Invokes the <see cref="Archive"/> event using the provided values.
         /// </summary>
         /// <param name="values">The values to send on for archiving.</param>
-        private void OnCompressionFilterPassed(IEnumerable<DataBufferValueChange> values) {
+        private void OnCompressionFilterPassed(IEnumerable<TagValue> values) {
             var vals = values?.ToArray();
             if (vals == null || vals.Length == 0) {
                 return;
             }
 
             try {
-                if (CompressionFilterValueEmitted != null) {
+                if (Archive != null) {
                     if (CanLogDebug) {
-                        Log?.LogDebug($"[{Name}] New values will be sent to subscribers for archiving: [ {String.Join(", ", vals.Select(x => $"{GetSampleValueForDisplay(x)} @ {x.Value.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}"))} ]");
+                        Log?.LogDebug($"[{Name}] New values will be sent to subscribers for archiving: [ {String.Join(", ", vals.Select(x => $"{GetSampleValueForDisplay(x)} @ {x.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}"))} ]");
                     }
-                    CompressionFilterValueEmitted.Invoke(vals);
+                    Archive.Invoke(vals);
                 }
             }
             catch (Exception e) {
-                Log?.LogError($"[{Name}] An unhandled exception occurred while invoking {nameof(CompressionFilterValueEmitted)} event handlers.", e);
+                Log?.LogError($"[{Name}] An unhandled exception occurred while invoking {nameof(Archive)} event handlers.", e);
             }
         }
 
@@ -318,7 +270,7 @@ namespace Aika {
         /// 
         /// <para>
         /// Incoming values that pass the exception filter will then be passed to the compression filter.  
-        /// If the values pass the compression filter, the <see cref="CompressionFilterValueEmitted"/> event will be raised, 
+        /// If the values pass the compression filter, the <see cref="Archive"/> event will be raised, 
         /// allowing subscribers to be notified about values that should be written to a data archive.
         /// </para>
         /// 
@@ -331,7 +283,7 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(incoming));
             }
 
-            _exceptionMonitor.ValueReceived(incoming);
+            _exceptionMonitor.ValueReceived((incoming, null));
         }
 
 
@@ -350,35 +302,6 @@ namespace Aika {
         #endregion
 
         #region [ Inner Types ]
-
-        /// <summary>
-        /// Describes a tag value change emitted by a <see cref="DataFilter"/>.
-        /// </summary>
-        public class DataBufferValueChange {
-
-            /// <summary>
-            /// Gets the tag value.
-            /// </summary>
-            public TagValue Value { get; }
-
-            /// <summary>
-            /// Gets the reason that the buffer is emitting the value to subscribers.
-            /// </summary>
-            public string Reason { get; }
-
-
-            /// <summary>
-            /// Creates a new <see cref="DataBufferValueChange"/> object.
-            /// </summary>
-            /// <param name="value">The value.</param>
-            /// <param name="reason">The reason that the value is being emitted.</param>
-            internal DataBufferValueChange(TagValue value, string reason) {
-                Value = value;
-                Reason = reason;
-            }
-
-        }
-
 
         /// <summary>
         /// Monitors incoming snapshot values and decides if those values should be emitted for further processing e.g. by a compression monitor.
@@ -419,7 +342,7 @@ namespace Aika {
             /// </summary>
             public TagValue LastReceivedValue { get; private set; }
 
-
+            
             /// <summary>
             /// Creates a new <see cref="ExceptionMonitor"/> object.
             /// </summary>
@@ -441,48 +364,57 @@ namespace Aika {
             /// </summary>
             /// <param name="incoming">The incoming tag value.</param>
             /// <param name="reason">The reason for the pass/fail (for debugging purposes only).</param>
+            /// <param name="limits">The limits that were calculated.</param>
             /// <returns>
             /// <see langword="true"/> if <paramref name="incoming"/> is considered to be exceptional, otherwise <see langword="false"/>.
             /// </returns>
-            private bool PassesExceptionFilter(TagValue incoming, out string reason) {
+            private bool PassesExceptionFilter(TagValue incoming, out string reason, out CalculatedLimits limits) {
                 if (LastExceptionValue == null) {
                     reason = "A last exception value has not been set on the exception monitor.";
+                    limits = null;
                     return true;
                 }
 
                 // Never allow values older than the current snapshot.
                 if (LastExceptionValue != null && incoming.UtcSampleTime < LastExceptionValue.UtcSampleTime) {
-                    reason = "The incoming snapshot value is earlier than the current exception value.";
+                    reason = "The incoming value is earlier than the current exception value.";
+                    limits = null;
                     return false;
                 }
 
                 if (!Filter.IsEnabled) {
                     reason = "The data compression buffer is disabled.";
+                    limits = null;
                     return true;
                 }
 
                 if (!Filter.ExceptionFilter.Settings.IsEnabled) {
                     reason = "Exception filtering is disabled.";
+                    limits = null;
                     return true;
                 }
 
                 if ((incoming.UtcSampleTime - LastExceptionValue.UtcSampleTime) > Filter.ExceptionFilter.Settings.WindowSize) {
-                    reason = $"The current exception value has a time stamp ({LastExceptionValue.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) that is more than {Filter.ExceptionFilter.Settings.WindowSize} older than the incoming snapshot value ({incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z).";
+                    reason = $"The current exception value has a time stamp ({LastExceptionValue.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) that is more than {Filter.ExceptionFilter.Settings.WindowSize} older than the incoming value ({incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z).";
+                    limits = null;
                     return true;
                 }
 
                 if (incoming.Quality != LastExceptionValue.Quality) {
-                    reason = $"The incoming snapshot value has a quality status ({incoming.Quality}) that is different to the current exception value ({LastExceptionValue.Quality})";
+                    reason = $"The incoming value has a quality status ({incoming.Quality}) that is different to the current exception value ({LastExceptionValue.Quality})";
+                    limits = null;
                     return true;
                 }
 
                 if (Double.IsNaN(incoming.NumericValue) && !String.Equals(incoming.TextValue, LastExceptionValue.TextValue)) {
-                    reason = $"The incoming snapshot value is non-numeric and has a different text value (\"{incoming.TextValue}\") to the current exception value ({LastExceptionValue.TextValue}).";
+                    reason = $"The incoming value is non-numeric and has a different text value (\"{incoming.TextValue}\") to the current exception value ({LastExceptionValue.TextValue}).";
+                    limits = null;
                     return true;
                 }
 
                 if (!Double.IsNaN(incoming.NumericValue) && Double.IsNaN(LastExceptionValue.NumericValue)) {
-                    reason = $"The incoming snapshot value is numeric ({incoming.NumericValue}), whereas the current exception value is non-numeric (\"{LastExceptionValue.TextValue}\").";
+                    reason = $"The incoming  value is numeric ({incoming.NumericValue}), whereas the current exception value is non-numeric (\"{LastExceptionValue.TextValue}\").";
+                    limits = null;
                     return true;
                 }
 
@@ -512,17 +444,19 @@ namespace Aika {
                     minValue = tmp;
                 }
 
+                limits = new CalculatedLimits(minValue, maxValue);
+
                 if (incoming.NumericValue < minValue) {
-                    reason = $"The incoming snapshot value ({incoming.NumericValue}) is less than the exception deviation limit ({minValue}).";
+                    reason = $"The incoming value ({incoming.NumericValue}) is less than the minimum exception deviation limit ({minValue}).";
                     return true;
                 }
 
                 if (incoming.NumericValue > maxValue) {
-                    reason = $"The incoming snapshot value ({incoming.NumericValue}) is greater than the exception deviation limit ({maxValue}).";
+                    reason = $"The incoming value ({incoming.NumericValue}) is greater than the maximum exception deviation limit ({maxValue}).";
                     return true;
                 }
 
-                reason = "The incoming snapshot value is inside the exception deviation limits.";
+                reason = "The incoming value is inside the exception deviation limits.";
                 return false;
             }
 
@@ -534,47 +468,60 @@ namespace Aika {
             /// <returns>
             /// A flag that indicates if the incoming value passed the exception filter.
             /// </returns>
-            public bool ValueReceived(TagValue incoming) {
-                if (incoming == null) {
+            public bool ValueReceived((TagValue value, string notes) incoming) {
+                if (incoming.value == null) {
                     return false;
                 }
 
-                string reason;
-                if (!PassesExceptionFilter(incoming, out reason)) {
-                    if (Filter.CanLogTrace) {
-                        Filter.Log.LogTrace($"[{Filter.Name}] The exception filter rejected the incoming snapshot value for the following reason: {reason}");
+                var now = DateTime.UtcNow;
+
+                ExceptionFilterResult result = null;
+
+                try {
+                    if (!PassesExceptionFilter(incoming.value, out var reason, out var limits)) {
+                        if (Filter.CanLogTrace) {
+                            Filter.Log.LogTrace($"[{Filter.Name}] The exception filter rejected the incoming value for the following reason: {reason}");
+                        }
+
+                        result = new ExceptionFilterResult(now, incoming.value, incoming.notes, new ExceptionFilterResultDetails(true, reason, LastExceptionValue, Filter.ExceptionFilter.Settings, limits == null ? null : new ExceptionFilterResultDetails.ExceptionLimits(limits.MinimumLimit, limits.MaximumLimit)));
+
+                        LastReceivedValue = incoming.value;
+                        return false;
+                    }
+                    else {
+                        if (Filter.CanLogTrace) {
+                            Filter.Log.LogTrace($"[{Filter.Name}] The incoming value passed the exception filter test.  The reason given was: {reason}");
+                        }
+
+                        result = new ExceptionFilterResult(now, incoming.value, null, new ExceptionFilterResultDetails(false, reason, LastExceptionValue, Filter.ExceptionFilter.Settings, limits == null ? null : new ExceptionFilterResultDetails.ExceptionLimits(limits.MinimumLimit, limits.MaximumLimit)));
+
+                        PreviousExceptionValue = LastExceptionValue;
+                        LastExceptionValue = incoming.value;
+
+                        var lastReceived = LastReceivedValue;
+
+                        // The lastReceived != LastSnapshotValue test below is used to ensure that, if we 
+                        // are reporting a new snapshot value, we won't send the last-received value if 
+                        // the last-received value was actually the previous value that passed the exception 
+                        // filter, since this value has already been sent previously.
+                        var snapshotValues = lastReceived != null && lastReceived.NumericValue != incoming.value.NumericValue && lastReceived != PreviousExceptionValue
+                            ? new(TagValue value, string notes)[] { (lastReceived, "This is the value received immediately before the value that passed the exception filter."), incoming }
+                            : new(TagValue value, string notes)[] { incoming };
+
+                        Filter.OnExceptionFilterPassed(snapshotValues);
+                        LastReceivedValue = incoming.value;
+
+                        return true;
                     }
 
-                    LastReceivedValue = incoming;
-                    return false;
+
                 }
-                else {
-                    if (Filter.CanLogTrace) {
-                        Filter.Log.LogTrace($"[{Filter.Name}] The incoming snapshot value passed the exception filter test.  The reason given was: {reason}");
+                finally {
+                    if (result != null) {
+                        Filter.ExceptionFilter.LastResult = result;
                     }
-
-                    PreviousExceptionValue = LastExceptionValue;
-                    LastExceptionValue = incoming;
-
-                    var lastReceived = LastReceivedValue;
-                    // The lastReceived != LastSnapshotValue test below is used to ensure that, if we 
-                    // are reporting a new snapshot value, we won't send the last-received value if 
-                    // the last-received value was actually the previous value that passed the exception 
-                    // filter, since this value has already been sent previously.
-                    var snapshotValues = lastReceived != null && lastReceived.NumericValue != incoming.NumericValue && lastReceived != PreviousExceptionValue
-                        ? new[] { new DataBufferValueChange(lastReceived, "This is the last-received snapshot value before the exception value."), new DataBufferValueChange(incoming, reason) }
-                        : new[] { new DataBufferValueChange(incoming, reason) };
-
-
-                    Filter.OnExceptionFilterPassed(snapshotValues);
-                    LastReceivedValue = incoming;
-
-                    return true;
                 }
-
-
             }
-
         }
 
 
@@ -659,12 +606,12 @@ namespace Aika {
             /// </summary>
             /// <param name="value">The value to calculate the compression limits for.</param>
             /// <returns>The new compression limits</returns>
-            private CompressionLimits CalculateNewCompressionLimits(TagValue value) {
+            private CalculatedLimits CalculateNewCompressionLimits(TagValue value) {
                 // If the value is non-numeric, set the compression limits so that the maximum limit is 
                 // Double.MinValue and the maximum limit is Double.MaxValue i.e. the next incoming 
                 // numerical value will pass the filter.
                 if (Double.IsNaN(value.NumericValue)) {
-                    return new CompressionLimits(Double.MinValue, Double.MaxValue);
+                    return new CalculatedLimits(Double.MinValue, Double.MaxValue);
                 }
 
                 double compressionDeviation = 0;
@@ -691,7 +638,7 @@ namespace Aika {
                     minCompressionValue = tmp;
                 }
 
-                return new CompressionLimits(minCompressionValue, maxCompressionValue);
+                return new CalculatedLimits(minCompressionValue, maxCompressionValue);
             }
 
 
@@ -704,7 +651,7 @@ namespace Aika {
             /// <param name="lastArchived">The last value that was sent for archiving.</param>
             /// <param name="lastReceived">The most-recently received snapshot tag value prior to the incoming value.</param>
             /// <returns>A tuple where the first value is the *MAXIMUM* limit and the second value is the *MINIMUM* limit.</returns>
-            private CompressionLimits InterpolateCompressionLimitsFromSlope(TagValue incoming, TagValue lastArchived, TagValue lastReceived) {
+            private CalculatedLimits InterpolateCompressionLimitsFromSlope(TagValue incoming, TagValue lastArchived, TagValue lastReceived) {
                 var x0 = LastArchivedValue.UtcSampleTime.Ticks;
                 var x1 = LastReceivedValue.UtcSampleTime.Ticks;
                 var x = incoming.UtcSampleTime.Ticks;
@@ -716,7 +663,7 @@ namespace Aika {
                 var y_max = y0 + (x - x0) * ((y1_max - y0) / (x1 - x0));
                 var y_min = y0 + (x - x0) * ((y1_min - y0) / (x1 - x0));
 
-                return new CompressionLimits(y_min, y_max);
+                return new CalculatedLimits(y_min, y_max);
             }
 
 
@@ -729,7 +676,7 @@ namespace Aika {
             /// <returns>
             /// <see langword="true"/> if <paramref name="incoming"/> is considered to be exceptional, otherwise <see langword="false"/>.
             /// </returns>
-            private bool PassesCompressionFilter(TagValue incoming, out string reason, out CompressionLimits interpolatedCompressionLimits) {
+            private bool PassesCompressionFilter(TagValue incoming, out string reason, out CalculatedLimits interpolatedCompressionLimits) {
                 if (!Filter.IsEnabled) {
                     reason = "The data compression buffer is disabled.";
                     interpolatedCompressionLimits = null;
@@ -755,25 +702,25 @@ namespace Aika {
                 }
 
                 if ((incoming.UtcSampleTime - LastArchivedValue.UtcSampleTime) > Filter.CompressionFilter.Settings.WindowSize) {
-                    reason = $"The last-archived value has a time stamp ({LastArchivedValue.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) that is more than {Filter.CompressionFilter.Settings.WindowSize} older than the incoming snapshot value ({incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z).";
+                    reason = $"The last-archived value has a time stamp ({LastArchivedValue.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) that is more than {Filter.CompressionFilter.Settings.WindowSize} older than the incoming value ({incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z).";
                     interpolatedCompressionLimits = null;
                     return true;
                 }
 
                 if (incoming.Quality != LastReceivedValue.Quality) {
-                    reason = $"The incoming snapshot value has a quality status ({incoming.Quality}) that is different to the last-received value ({LastReceivedValue.Quality}).";
+                    reason = $"The incoming value has a quality status ({incoming.Quality}) that is different to the last-received value ({LastReceivedValue.Quality}).";
                     interpolatedCompressionLimits = null;
                     return true;
                 }
 
                 if (Double.IsNaN(incoming.NumericValue) && !String.Equals(incoming.TextValue, LastReceivedValue.TextValue)) {
-                    reason = $"The incoming snapshot value is non-numeric and has a different text value (\"{incoming.TextValue}\") to the last-received value ({LastReceivedValue.TextValue}).";
+                    reason = $"The incoming value is non-numeric and has a different text value (\"{incoming.TextValue}\") to the last-received value ({LastReceivedValue.TextValue}).";
                     interpolatedCompressionLimits = null;
                     return true;
                 }
 
                 if (!Double.IsNaN(incoming.NumericValue) && Double.IsNaN(LastReceivedValue.NumericValue)) {
-                    reason = $"The incoming snapshot value is numeric ({incoming.NumericValue}), whereas the last-received value is non-numeric (\"{LastReceivedValue.TextValue}\").";
+                    reason = $"The incoming value is numeric ({incoming.NumericValue}), whereas the last-received value is non-numeric (\"{LastReceivedValue.TextValue}\").";
                     interpolatedCompressionLimits = null;
                     return true;
                 }
@@ -795,16 +742,16 @@ namespace Aika {
                 var y_min = interpolatedCompressionLimits.MinimumLimit;
 
                 if (incoming.NumericValue > y_max) {
-                    reason = $"The incoming snapshot value ({incoming.NumericValue} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) is greater than the compression deviation limit calculated for the incoming time stamp ({y_max}).";
+                    reason = $"The incoming value ({incoming.NumericValue} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) is greater than the compression deviation limit calculated for the incoming time stamp ({y_max}).";
                     return true;
                 }
 
                 if (incoming.NumericValue < y_min) {
-                    reason = $"The incoming snapshot value ({incoming.NumericValue} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) is less than the compression deviation limit calculated for the incoming sample time stamp ({y_min}).";
+                    reason = $"The incoming value ({incoming.NumericValue} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) is less than the compression deviation limit calculated for the incoming sample time stamp ({y_min}).";
                     return true;
                 }
 
-                reason = $"The incoming snapshot value ({incoming.NumericValue} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) is inside the compression deviation limits calculated for the incoming sample time stamp ({y_min} <= x <= {y_max}).";
+                reason = $"The incoming value ({incoming.NumericValue} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z) is inside the compression deviation limits calculated for the incoming sample time stamp ({y_min} <= x <= {y_max}).";
                 return false;
             }
 
@@ -813,71 +760,126 @@ namespace Aika {
             /// Informs the <see cref="CompressionMonitor"/> that a new snapshot value has been received.
             /// </summary>
             /// <param name="incoming">The incoming value.</param>
-            /// <param name="archiveCallback">An optional callback function to pass new archive values to.  Pass a value here if you need to define custom behaviour for receiving archive value changes instead of handling the <see cref="CompressionFilterValueEmitted"/> event.</param>
+            /// <param name="archiveCallback">An optional callback function to pass new archive values to.  Pass a value here if you need to define custom behaviour for receiving archive value changes instead of handling the <see cref="Archive"/> event.</param>
             /// <returns>A flag that indicates if the incoming value passed the compression filter.</returns>
-            public bool ValueReceived(TagValue incoming) {
-                if (incoming == null) {
+            public bool ValueReceived((TagValue value, string notes) incoming) {
+                if (incoming.value == null) {
                     return false;
                 }
 
-                string reason;
-                CompressionLimits interpolatedCompressionLimits;
+                var now = DateTime.UtcNow;
 
-                var passesCompression = PassesCompressionFilter(incoming, out reason, out interpolatedCompressionLimits);
-                var calculatedCompressionLimits = CalculateNewCompressionLimits(incoming);
+                CompressionFilterResult result = null;
 
-                if (passesCompression) {
-                    if (Filter.CanLogTrace) {
-                        Filter.Log.LogTrace($"[{Filter.Name}] The incoming snapshot value passed the compression filter test.  The reason given was: {reason}");
-                    }
+                try {
+                    string reason;
+                    CalculatedLimits interpolatedCompressionLimits;
 
-                    var valueToArchive = LastReceivedValue;
-                    if (valueToArchive != null) {
-                        LastArchivedValue = valueToArchive;
-                        Filter.OnCompressionFilterPassed(new[] { new DataBufferValueChange(valueToArchive, reason) });
+                    var passesCompression = PassesCompressionFilter(incoming.value, out reason, out interpolatedCompressionLimits);
+                    var calculatedCompressionLimits = CalculateNewCompressionLimits(incoming.value);
+
+                    if (passesCompression) {
+                        if (Filter.CanLogTrace) {
+                            Filter.Log.LogTrace($"[{Filter.Name}] The incoming value passed the compression filter test.  The reason given was: {reason}");
+                        }
+
+                        result = new CompressionFilterResult(
+                            now,
+                            incoming.value,
+                            incoming.notes,
+                            new CompressionFilterResultDetails(
+                                !passesCompression,
+                                reason,
+                                LastArchivedValue,
+                                LastReceivedValue,
+                                Filter.CompressionFilter.Settings,
+                                new CompressionFilterResultDetails.CompressionLimits(
+                                    LastArchivedValue == null
+                                        ? null
+                                        : new CompressionFilterResultDetails.CompressionLimitSet(LastArchivedValue.UtcSampleTime, CompressionMinimum, CompressionMaximum),
+                                    interpolatedCompressionLimits == null
+                                        ? null
+                                        : new CompressionFilterResultDetails.CompressionLimitSet(incoming.value.UtcSampleTime, interpolatedCompressionLimits.MinimumLimit, interpolatedCompressionLimits.MaximumLimit),
+                                    new CompressionFilterResultDetails.CompressionLimitSet(incoming.value.UtcSampleTime, calculatedCompressionLimits.MinimumLimit, calculatedCompressionLimits.MaximumLimit)
+                                )
+                            )
+                        );
+
+                        var valueToArchive = LastReceivedValue;
+                        if (valueToArchive != null) {
+                            LastArchivedValue = valueToArchive;
+                            Filter.OnCompressionFilterPassed(new[] { valueToArchive });
+                        }
+                        else {
+                            if (Filter.CanLogDebug) {
+                                Filter.Log.LogDebug($"[{Filter.Name}] The incoming value passed the compression filter test, but the compression filter does not yet define a last-received value.  Therefore, no value will be sent for archiving.  This behaviour can occur the first time a value passes the compression filter after the {nameof(DataFilter)} starts up.  The incoming value will be sent for archiving the next time an incoming value passes the compression filter test.");
+                            }
+                        }
+
+                        if (Filter.CanLogTrace) {
+                            Filter.Log.LogTrace($"[{Filter.Name}] Updating the compression buffer's last-received value: {Filter.GetSampleValueForDisplay(incoming.value)} @ {incoming.value.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}.");
+                            Filter.Log.LogTrace($"[{Filter.Name}] Adjusting compression slopes for next incoming value: Last Archived Value = {Filter.GetSampleValueForDisplay(LastArchivedValue)} @ {LastArchivedValue.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z , Compression Slope Min/Max = {calculatedCompressionLimits.MinimumLimit}/{calculatedCompressionLimits.MaximumLimit} @ {incoming.value.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z");
+                        }
+
+                        LastReceivedValue = incoming.value;
+                        CompressionMaximum = calculatedCompressionLimits.MaximumLimit;
+                        CompressionMinimum = calculatedCompressionLimits.MinimumLimit;
+
+                        return true;
                     }
                     else {
-                        if (Filter.CanLogDebug) {
-                            Filter.Log.LogDebug($"[{Filter.Name}] The incoming snapshot value passed the compression filter test, but the compression filter does not yet define a last-received value.  Therefore, no value will be sent for archiving.  This behaviour can occur the first time a value passes the compression filter after the {nameof(DataFilter)} starts up.  The incoming value will be sent for archiving the next time an incoming value passes the compression filter test.");
+                        if (Filter.CanLogTrace) {
+                            Filter.Log.LogTrace($"[{Filter.Name}] The compression filter rejected the incoming value for the following reason: {reason}");
                         }
+
+                        var maxCompressionValueAtNewSnapshot = calculatedCompressionLimits.MaximumLimit;
+                        if (interpolatedCompressionLimits != null && maxCompressionValueAtNewSnapshot > interpolatedCompressionLimits.MaximumLimit) {
+                            maxCompressionValueAtNewSnapshot = interpolatedCompressionLimits.MaximumLimit;
+                        }
+
+                        var minCompressionValueAtNewSnapshot = calculatedCompressionLimits.MinimumLimit;
+                        if (interpolatedCompressionLimits != null && minCompressionValueAtNewSnapshot < interpolatedCompressionLimits.MinimumLimit) {
+                            minCompressionValueAtNewSnapshot = interpolatedCompressionLimits.MinimumLimit;
+                        }
+
+                        if (Filter.CanLogTrace) {
+                            Filter.Log.LogTrace($"[{Filter.Name}] Updating the compression buffer's last-received value: {Filter.GetSampleValueForDisplay(incoming.value)} @ {incoming.value.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}");
+                            Filter.Log.LogTrace($"[{Filter.Name}] Adjusting compression slopes for next incoming value: Last Archived Value = {Filter.GetSampleValueForDisplay(LastArchivedValue)} @ {LastArchivedValue.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z , Compression Slope Min/Max = {minCompressionValueAtNewSnapshot}/{maxCompressionValueAtNewSnapshot} @ {incoming.value.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z");
+                        }
+
+                        result = new CompressionFilterResult(
+                            now,
+                            incoming.value,
+                            incoming.notes,
+                            new CompressionFilterResultDetails(
+                                !passesCompression,
+                                reason,
+                                LastArchivedValue,
+                                LastReceivedValue,
+                                Filter.CompressionFilter.Settings,
+                                new CompressionFilterResultDetails.CompressionLimits(
+                                    LastArchivedValue == null
+                                        ? null
+                                        : new CompressionFilterResultDetails.CompressionLimitSet(LastArchivedValue.UtcSampleTime, CompressionMinimum, CompressionMaximum),
+                                    interpolatedCompressionLimits == null
+                                        ? null
+                                        : new CompressionFilterResultDetails.CompressionLimitSet(incoming.value.UtcSampleTime, interpolatedCompressionLimits.MinimumLimit, interpolatedCompressionLimits.MaximumLimit),
+                                    new CompressionFilterResultDetails.CompressionLimitSet(incoming.value.UtcSampleTime, minCompressionValueAtNewSnapshot, maxCompressionValueAtNewSnapshot)
+                                )
+                            )
+                        );
+
+                        LastReceivedValue = incoming.value;
+                        CompressionMaximum = maxCompressionValueAtNewSnapshot;
+                        CompressionMinimum = minCompressionValueAtNewSnapshot;
+
+                        return false;
                     }
-
-                    if (Filter.CanLogTrace) {
-                        Filter.Log.LogTrace($"[{Filter.Name}] Updating the compression buffer's last-received value: {Filter.GetSampleValueForDisplay(incoming)} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}.");
-                        Filter.Log.LogTrace($"[{Filter.Name}] Adjusting compression slopes for next incoming value: Last Archived Value = {Filter.GetSampleValueForDisplay(LastArchivedValue)} @ {LastArchivedValue.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z , Compression Slope Min/Max = {calculatedCompressionLimits.MinimumLimit}/{calculatedCompressionLimits.MaximumLimit} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z");
-                    }
-
-                    LastReceivedValue = incoming;
-                    CompressionMaximum = calculatedCompressionLimits.MaximumLimit;
-                    CompressionMinimum = calculatedCompressionLimits.MinimumLimit;
-
-                    return true;
                 }
-                else {
-                    if (Filter.CanLogTrace) {
-                        Filter.Log.LogTrace($"[{Filter.Name}] The compression filter rejected the incoming snapshot value for the following reason: {reason}");
+                finally {
+                    if (result != null) {
+                        Filter.CompressionFilter.LastResult = result;
                     }
-
-                    var maxCompressionValueAtNewSnapshot = calculatedCompressionLimits.MaximumLimit;
-                    if (interpolatedCompressionLimits != null && maxCompressionValueAtNewSnapshot > interpolatedCompressionLimits.MaximumLimit) {
-                        maxCompressionValueAtNewSnapshot = interpolatedCompressionLimits.MaximumLimit;
-                    }
-
-                    var minCompressionValueAtNewSnapshot = calculatedCompressionLimits.MinimumLimit;
-                    if (interpolatedCompressionLimits != null && minCompressionValueAtNewSnapshot < interpolatedCompressionLimits.MinimumLimit) {
-                        minCompressionValueAtNewSnapshot = interpolatedCompressionLimits.MinimumLimit;
-                    }
-
-                    if (Filter.CanLogTrace) {
-                        Filter.Log.LogTrace($"[{Filter.Name}] Updating the compression buffer's last-received value: {Filter.GetSampleValueForDisplay(incoming)} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}");
-                        Filter.Log.LogTrace($"[{Filter.Name}] Adjusting compression slopes for next incoming value: Last Archived Value = {Filter.GetSampleValueForDisplay(LastArchivedValue)} @ {LastArchivedValue.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z , Compression Slope Min/Max = {minCompressionValueAtNewSnapshot}/{maxCompressionValueAtNewSnapshot} @ {incoming.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z");
-                    }
-
-                    LastReceivedValue = incoming;
-                    CompressionMaximum = maxCompressionValueAtNewSnapshot;
-                    CompressionMinimum = minCompressionValueAtNewSnapshot;
-
-                    return false;
                 }
             }
 
@@ -885,9 +887,9 @@ namespace Aika {
 
 
         /// <summary>
-        /// Describes calculated limits on a pair of min/max compression slopes.
+        /// Describes calculated limits used for exception or compression filtering.
         /// </summary>
-        private class CompressionLimits {
+        private class CalculatedLimits {
 
             /// <summary>
             /// Gets the minimum limit value.
@@ -901,11 +903,11 @@ namespace Aika {
 
 
             /// <summary>
-            /// Creates a new <see cref="CompressionLimits"/> object.
+            /// Creates a new <see cref="CalculatedLimits"/> object.
             /// </summary>
             /// <param name="minimumLimit">The minimum limit.</param>
             /// <param name="maximumLimit">The maximum limit.</param>
-            public CompressionLimits(double minimumLimit, double maximumLimit) {
+            public CalculatedLimits(double minimumLimit, double maximumLimit) {
                 MinimumLimit = minimumLimit;
                 MaximumLimit = maximumLimit;
             }
@@ -915,4 +917,5 @@ namespace Aika {
         #endregion
 
     }
+
 }

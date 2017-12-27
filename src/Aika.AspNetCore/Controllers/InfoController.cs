@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Aika.AspNetCore.Models;
+using Aika.Client.Dto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -65,10 +65,11 @@ namespace Aika.AspNetCore.Controllers {
         [Authorize(Policy = Authorization.Scopes.Administrator)]
         [ProducesResponseType(200, Type = typeof(AikaInfoDto))]
         public async Task<IActionResult> GetInfoExtended(CancellationToken cancellationToken) {
-            var result = new AikaInfoExtendedDto(_historian.Historian) {
+            var result = new AikaInfoExtendedDto() {
                 UtcStartupTime = _historian.UtcStartupTime,
                 Version = _historian.GetType().Assembly?.GetName().Version.ToString(),
-                Properties = new Dictionary<string, string>()
+                Properties = new Dictionary<string, string>(),
+                Historian = _historian.Historian.ToHistorianInfoDto()
             };
 
             return Ok(result); // 200

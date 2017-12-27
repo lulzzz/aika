@@ -59,16 +59,6 @@ namespace Aika {
         public string StateSet { get; private set; }
 
         /// <summary>
-        /// Gets the exception filter settings for the tag.
-        /// </summary>
-        public TagValueFilterSettings ExceptionFilterSettings { get; }
-
-        /// <summary>
-        /// Gets the compression filter settings for the tag.
-        /// </summary>
-        public TagValueFilterSettings CompressionFilterSettings { get; }
-
-        /// <summary>
         /// Gets the UTC creation time for the tag.
         /// </summary>
         public DateTime UtcCreatedAt { get; private set; }
@@ -96,10 +86,9 @@ namespace Aika {
         }
 
         /// <summary>
-        /// The data filter for the tag.
+        /// Gets the data filter for the tag.
         /// </summary>
-        private readonly DataFilter _dataFilter;
-
+        public DataFilter DataFilter { get; }
 
         /// <summary>
         /// Raised whenever the snapshot value of the tag changes.
@@ -150,21 +139,21 @@ namespace Aika {
             Units = units;
             DataType = dataType;
             StateSet = stateSet;
-            ExceptionFilterSettings = exceptionFilterSettings ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
-            CompressionFilterSettings = compressionFilterSettings ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
+            exceptionFilterSettings = exceptionFilterSettings ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
+            compressionFilterSettings = compressionFilterSettings ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
             UtcCreatedAt = utcCreatedAt ?? DateTime.UtcNow;
             UtcLastModifiedAt = utcLastModifiedAt ?? UtcCreatedAt;
 
             SnapshotValue = snapshotValue;
-            _dataFilter = new DataFilter(Name, new ExceptionFilterState(ExceptionFilterSettings, SnapshotValue), new CompressionFilterState(CompressionFilterSettings, lastArchivedValue, null), loggerFactory);
-            _dataFilter.CompressionFilterValueEmitted += values => {
+            DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, SnapshotValue), new CompressionFilterState(compressionFilterSettings, lastArchivedValue, null), loggerFactory);
+            DataFilter.Archive += values => {
                 if (_logger.IsEnabled(LogLevel.Trace)) {
                     _logger.LogTrace($"[{Name}] Archiving {values.Count()} values emitted by the compression filter.");
                 }
 
                 _taskRunner.RunBackgroundTask(async ct => {
                     try {
-                        await InsertArchiveValues(values.Select(x => x.Value).ToArray(), ct).ConfigureAwait(false);
+                        await InsertArchiveValues(values.ToArray(), ct).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) {
                         // App is shutting down...
@@ -175,7 +164,7 @@ namespace Aika {
                 });
             };
 
-            SnapshotValueUpdated += val => _dataFilter.ValueReceived(val);
+            SnapshotValueUpdated += val => DataFilter.ValueReceived(val);
         }
 
 
@@ -286,10 +275,10 @@ namespace Aika {
             StateSet = update.StateSet;
 
             if (update.ExceptionFilterSettings != null) {
-                ExceptionFilterSettings.Update(update.ExceptionFilterSettings);
+                DataFilter.ExceptionFilter.Settings.Update(update.ExceptionFilterSettings);
             }
             if (update.CompressionFilterSettings != null) {
-                CompressionFilterSettings.Update(update.CompressionFilterSettings);
+                DataFilter.CompressionFilter.Settings.Update(update.CompressionFilterSettings);
             }
 
             Updated?.Invoke(this);

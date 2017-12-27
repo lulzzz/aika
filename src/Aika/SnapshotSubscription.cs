@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Aika {
     /// <summary>
-    /// Describes a real-time subscription that receives snapshot value changes as they ocur.
+    /// Describes a real-time subscription that receives snapshot value changes as they occur.
     /// </summary>
     public class SnapshotSubscription : IDisposable {
 

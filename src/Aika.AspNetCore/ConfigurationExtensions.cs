@@ -134,6 +134,7 @@ namespace Aika.AspNetCore {
             }
 
             hubRouteBuilder.MapHub<Hubs.SnapshotHub>("aika/hubs/snapshot");
+            hubRouteBuilder.MapHub<Hubs.DataFilterHub>("aika/hubs/datafilter");
 
             return hubRouteBuilder;
         }

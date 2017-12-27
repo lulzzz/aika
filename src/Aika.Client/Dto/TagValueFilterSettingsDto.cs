@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Aika.AspNetCore.Models {
+namespace Aika.Client.Dto {
     /// <summary>
     /// Describes the settings for an exception or compression filter for a tag.
     /// </summary>
@@ -19,7 +19,7 @@ namespace Aika.AspNetCore.Models {
         /// <summary>
         /// Gets or sets the filter limit type.
         /// </summary>
-        public TagValueFilterDeviationType? LimitType { get; set; }
+        public string LimitType { get; set; }
 
         /// <summary>
         /// Gets or sets the filter limit threshold.
@@ -33,45 +33,6 @@ namespace Aika.AspNetCore.Models {
 
 
         /// <summary>
-        /// Creates a new <see cref="TagValueFilterSettingsDto"/> object.
-        /// </summary>
-        public TagValueFilterSettingsDto() { }
-
-
-        /// <summary>
-        /// Creates a new <see cref="TagValueFilterSettingsDto"/> object from an equivalent <see cref="TagValueFilterSettings"/> object.
-        /// </summary>
-        /// <param name="settings">The equivalent <see cref="TagValueFilterSettings"/> object.</param>
-        /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
-        internal TagValueFilterSettingsDto(TagValueFilterSettings settings) : this() {
-            if (settings == null) {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            IsEnabled = settings.IsEnabled;
-            LimitType = settings.LimitType;
-            Limit = settings.Limit;
-            WindowSize = settings.WindowSize;
-        }
-
-
-        /// <summary>
-        /// Converts the object into the equivalent <see cref="TagValueFilterSettingsUpdate"/> object.
-        /// </summary>
-        /// <returns>
-        /// An equivalent <see cref="TagValueFilterSettingsUpdate"/> object.
-        /// </returns>
-        internal TagValueFilterSettingsUpdate ToTagValueFilterSettingsUpdate() {
-            return new TagValueFilterSettingsUpdate() {
-                IsEnabled = IsEnabled,
-                LimitType = LimitType,
-                Limit = Limit,
-                WindowSize = WindowSize
-            };
-        }
-
-
-        /// <summary>
         /// Validates the object.
         /// </summary>
         /// <param name="validationContext">The validation context.</param>
@@ -80,7 +41,7 @@ namespace Aika.AspNetCore.Models {
         /// </returns>
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) {
             if (IsEnabled) {
-                if (!LimitType.HasValue) {
+                if (String.IsNullOrWhiteSpace(LimitType)) {
                     yield return new ValidationResult("Limit type is required when the filter is enabled.", new[] { nameof(LimitType) });
                 }
                 if (!Limit.HasValue) {
