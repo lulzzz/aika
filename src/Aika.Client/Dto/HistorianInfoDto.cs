@@ -5,12 +5,12 @@ using System.Threading.Tasks;
 
 namespace Aika.Client.Dto {
     /// <summary>
-    /// Descrribes the underlying <see cref="IHistorian"/> implementation being used by the Aika historian.
+    /// Describes the underlying historian implementation being used by the Aika historian.
     /// </summary>
     public class HistorianInfoDto {
 
         /// <summary>
-        /// Gets or sets the type name of the <see cref="IHistorian"/> implementation.
+        /// Gets or sets the type name of the historian implementation.
         /// </summary>
         public string TypeName { get; set; }
 

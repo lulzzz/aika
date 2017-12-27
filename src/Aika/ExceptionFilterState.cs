@@ -23,10 +23,13 @@ namespace Aika
         /// Gets the most recent value that passed through the exception filter.  If  <see langword="null"/>, 
         /// the next value passed to the filter will always be considered to be exceptional.
         /// </summary>
-        /// <remarks>
-        /// Note that this property will be updated by the filter as incoming values are processed.
-        /// </remarks>
         public TagValue LastExceptionValue { get; internal set; }
+
+        /// <summary>
+        /// Gets the last value that was received by the exception filter (regardless of whether or 
+        /// not it passed through the filter).
+        /// </summary>
+        public TagValue LastReceivedValue { get; internal set; }
 
         /// <summary>
         /// The results of the processing that the exception filter performed on its 
@@ -65,6 +68,7 @@ namespace Aika
         public ExceptionFilterState(TagValueFilterSettings settings, TagValue initialExceptionValue) {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             LastExceptionValue = initialExceptionValue;
+            LastReceivedValue = initialExceptionValue;
         }
 
     }

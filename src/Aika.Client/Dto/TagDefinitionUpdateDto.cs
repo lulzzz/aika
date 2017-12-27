@@ -38,7 +38,7 @@ namespace Aika.Client.Dto {
 
         /// <summary>
         /// Gets or sets the name of the discrete state set to use for the tag, when <see cref="DataType"/> 
-        /// is <see cref="TagDataType.State"/>.
+        /// is state-based.
         /// </summary>
         public string StateSet { get; set; }
 

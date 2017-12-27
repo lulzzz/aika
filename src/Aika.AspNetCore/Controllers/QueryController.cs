@@ -76,7 +76,11 @@ namespace Aika.AspNetCore.Controllers {
         /// <summary>
         /// Performs a tag search.
         /// </summary>
-        /// <param name="request">The tag search request.</param>
+        /// <param name="name">The tag name filter.</param>
+        /// <param name="description">The tag description filter.</param>
+        /// <param name="units">The tag units filter.</param>
+        /// <param name="pageSize">The query page size to use.</param>
+        /// <param name="page">The results page to retrieve.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// Successful responses contain a page of matching search results.

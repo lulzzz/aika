@@ -150,6 +150,14 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         }
 
 
+        /// <summary>
+        /// Creates a new tag.
+        /// </summary>
+        /// <param name="tag">The tag definition.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// Successful responses contain the new tag definition.
+        /// </returns>
         [HttpPost]
         [Route("")]
         [ProducesResponseType(201, Type = typeof(TagDefinitionExtendedDto))]
@@ -180,6 +188,15 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         }
 
 
+        /// <summary>
+        /// Updates an existing tag.
+        /// </summary>
+        /// <param name="id">The ID of the tag to update.</param>
+        /// <param name="tag">The updated tag definition.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// Successful responses contain the updated tag definition.
+        /// </returns>
         [HttpPut]
         [Route("{id}")]
         [ProducesResponseType(200, Type = typeof(TagDefinitionExtendedDto))]
@@ -210,6 +227,14 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         }
 
 
+        /// <summary>
+        /// Deletes a tag.
+        /// </summary>
+        /// <param name="id">The ID of the tag to delete.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// 
+        /// </returns>
         [HttpDelete]
         [Route("{id}")]
         [ProducesResponseType(200, Type = typeof(bool))]

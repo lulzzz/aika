@@ -197,35 +197,33 @@ namespace Aika.AspNetCore {
                 UtcReceivedAt = result.UtcReceivedAt,
                 Value = result.Value.ToTagValueDto(),
                 Notes = result.Notes,
-                Result = new TagCompressionFilterResultDetailsDto() {
-                    Rejected = result.Result.Rejected,
-                    Reason = result.Result.Reason,
-                    LastArchivedValue = result.Result.LastArchivedValue.ToTagValueDto(),
-                    LastReceivedValue = result.Result.LastReceivedValue.ToTagValueDto(),
-                    Settings = result.Result.Settings.ToTagValueFilterSettingsDto(),
-                    Limits = new TagCompressionLimitsDto() {
-                        Base = result.Result.Limits.Base == null
-                            ? null
-                            : new TagCompressionLimitSetDto() {
-                                UtcSampleTime = result.Result.Limits.Base.UtcSampleTime,
-                                Minimum = result.Result.Limits.Base.Minimum,
-                                Maximum = result.Result.Limits.Base.Maximum
-                            },
-                        Incoming = result.Result.Limits.Incoming == null
-                            ? null
-                            : new TagCompressionLimitSetDto() {
-                                UtcSampleTime = result.Result.Limits.Incoming.UtcSampleTime,
-                                Minimum = result.Result.Limits.Incoming.Minimum,
-                                Maximum = result.Result.Limits.Incoming.Maximum
-                            },
-                        Updated = result.Result.Limits.Updated == null
-                            ? null
-                            : new TagCompressionLimitSetDto() {
-                                UtcSampleTime = result.Result.Limits.Updated.UtcSampleTime,
-                                Minimum = result.Result.Limits.Updated.Minimum,
-                                Maximum = result.Result.Limits.Updated.Maximum
-                            }
-                    }
+                Rejected = result.Result.Rejected,
+                Reason = result.Result.Reason,
+                LastArchivedValue = result.Result.LastArchivedValue.ToTagValueDto(),
+                LastReceivedValue = result.Result.LastReceivedValue.ToTagValueDto(),
+                Settings = result.Result.Settings.ToTagValueFilterSettingsDto(),
+                Limits = new TagCompressionLimitsDto() {
+                    Base = result.Result.Limits.Base == null
+                        ? null
+                        : new TagCompressionLimitSetDto() {
+                            UtcSampleTime = result.Result.Limits.Base.UtcSampleTime,
+                            Minimum = result.Result.Limits.Base.Minimum,
+                            Maximum = result.Result.Limits.Base.Maximum
+                        },
+                    Incoming = result.Result.Limits.Incoming == null
+                        ? null
+                        : new TagCompressionLimitSetDto() {
+                            UtcSampleTime = result.Result.Limits.Incoming.UtcSampleTime,
+                            Minimum = result.Result.Limits.Incoming.Minimum,
+                            Maximum = result.Result.Limits.Incoming.Maximum
+                        },
+                    Updated = result.Result.Limits.Updated == null
+                        ? null
+                        : new TagCompressionLimitSetDto() {
+                            UtcSampleTime = result.Result.Limits.Updated.UtcSampleTime,
+                            Minimum = result.Result.Limits.Updated.Minimum,
+                            Maximum = result.Result.Limits.Updated.Maximum
+                        }
                 }
             };
         }
@@ -242,18 +240,16 @@ namespace Aika.AspNetCore {
                 UtcReceivedAt = result.UtcReceivedAt,
                 Value = result.Value.ToTagValueDto(),
                 Notes = result.Notes,
-                Result = new TagExceptionFilterResultDetailsDto() {
-                    Rejected = result.Result.Rejected,
-                    Reason = result.Result.Reason,
-                    LastExceptionValue = result.Result.LastExceptionValue.ToTagValueDto(),
-                    Settings = result.Result.Settings.ToTagValueFilterSettingsDto(),
-                    Limits = result.Result.Limits == null
-                        ? null
-                        : new TagExceptionLimitSetDto() {
-                            Minimum = result.Result.Limits.Minimum,
-                            Maximum = result.Result.Limits.Maximum
-                        }
-                }
+                Rejected = result.Result.Rejected,
+                Reason = result.Result.Reason,
+                LastExceptionValue = result.Result.LastExceptionValue.ToTagValueDto(),
+                Settings = result.Result.Settings.ToTagValueFilterSettingsDto(),
+                Limits = result.Result.Limits == null
+                    ? null
+                    : new TagExceptionLimitSetDto() {
+                        Minimum = result.Result.Limits.Minimum,
+                        Maximum = result.Result.Limits.Maximum
+                    }
             };
         }
 
