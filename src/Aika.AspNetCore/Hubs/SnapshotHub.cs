@@ -13,7 +13,7 @@ namespace Aika.AspNetCore.Hubs {
     /// <summary>
     /// SignalR hub for pushing real-time value changes to subscribers.
     /// </summary>
-    [Authorize(Policy = Authorization.Scopes.ReadTagData)]
+    [Authorize(Policy = Authorization.Policies.ReadTagData)]
     public class SnapshotHub : Hub {
 
         /// <summary>
@@ -36,33 +36,30 @@ namespace Aika.AspNetCore.Hubs {
         }
 
 
-        private SnapshotSubscription GetOrAddSubscription() {
-            var connectionId = Context.ConnectionId;
-            return _subscriptions.GetOrAdd(connectionId, key => {
-                var client = Clients.Client(connectionId);
-                var subscription = _historian.CreateSnapshotSubscription(Context.User);
-                subscription.ValuesReceived += values => {
-                    client.InvokeAsync("ValuesReceived", values);
-                };
-
-                return subscription;
-            });
-        }
-
-
-        private SnapshotSubscription GetSubscription() {
-            return _subscriptions.TryGetValue(Context.ConnectionId, out var subscription) 
-                ? subscription 
-                : null;
-        }
-
-
+        /// <summary>
+        /// Called when a client connects to the hub.
+        /// </summary>
+        /// <returns>
+        /// A task that will register a snapshot subscription for the client.
+        /// </returns>
         public override Task OnConnectedAsync() {
-            GetOrAddSubscription();
+            var client = Clients.Client(Context.ConnectionId);
+            var subscription = _historian.CreateSnapshotSubscription(Context.User);
+            subscription.ValuesReceived += values => {
+                client.InvokeAsync("ValuesReceived", values);
+            };
+            _subscriptions[Context.ConnectionId] = subscription;
             return base.OnConnectedAsync();
         }
 
 
+        /// <summary>
+        /// Called when a client disconnects from the hub.
+        /// </summary>
+        /// <param name="exception"></param>
+        /// <returns>
+        /// A task that will unregister the snapshot subscription for the client.
+        /// </returns>
         public override Task OnDisconnectedAsync(Exception exception) {
             if (_subscriptions.TryRemove(Context.ConnectionId, out var removed)) {
                 removed.Dispose();
@@ -72,25 +69,28 @@ namespace Aika.AspNetCore.Hubs {
         }
 
 
+        /// <summary>
+        /// Subscribes the caller to receive snapshot updates for the specified tag names.
+        /// </summary>
+        /// <param name="tagNames">The tag names to receive updates for.</param>
+        /// <returns>
+        /// A task that will process the request.
+        /// </returns>
         public async Task Subscribe(IEnumerable<string> tagNames) {
-            var connectionId = Context.ConnectionId;
-
-            var subscription = GetSubscription();
-            if (subscription == null) {
-                return;
-            }
+            var subscription = _subscriptions[Context.ConnectionId];
             await subscription.AddTags(Context.User, tagNames, Context.Connection.ConnectionAbortedToken).ConfigureAwait(false);
         }
 
 
+        /// <summary>
+        /// Unsubscribes the caller from receiving snapshot updates for the specified tag names.
+        /// </summary>
+        /// <param name="tagNames">The tag names to unsubscribe from.</param>
+        /// <returns>
+        /// A task that will process the request.
+        /// </returns>
         public async Task Unsubscribe(IEnumerable<string> tagNames) {
-            var connectionId = Context.ConnectionId;
-
-            var subscription = GetSubscription();
-            if (subscription == null) {
-                return;
-            }
-
+            var subscription = _subscriptions[Context.ConnectionId];
             await subscription.RemoveTags(Context.User, tagNames, Context.Connection.ConnectionAbortedToken).ConfigureAwait(false);
         }
 

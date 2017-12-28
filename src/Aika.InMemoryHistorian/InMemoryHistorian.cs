@@ -32,8 +32,8 @@ namespace Aika.Historians {
         }
 
 
-        public IDictionary<string, string> Properties {
-            get { return null; }
+        public IDictionary<string, object> Properties {
+            get { return new Dictionary<string, object>(); }
         }
 
 
@@ -183,6 +183,7 @@ namespace Aika.Historians {
 
         internal WriteTagValuesResult InsertArchiveValues(string tagId, IEnumerable<TagValue> values) {
             var rawData = _rawData.GetOrAdd(tagId, x => new RawDataSet());
+            var tag = _tags[tagId];
 
             rawData.Lock.EnterWriteLock();
             try {
@@ -218,6 +219,11 @@ namespace Aika.Historians {
                 return new WriteTagValuesResult(true, insertedSampleCount, firstValueToInsert.UtcSampleTime, lastValueToInsert.UtcSampleTime, notes);
             }
             finally {
+                tag.Properties["Sample Count"] = rawData.Count;
+                if (rawData.Count > 0) {
+                    tag.Properties["Earliest Sample Time"] = rawData.Keys.First().ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                    tag.Properties["Latest Sample Time"] = rawData.Keys.Last().ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                }
                 rawData.Lock.ExitWriteLock();
             }
         }

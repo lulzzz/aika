@@ -15,7 +15,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
     /// API controller for managing the state sets available to historian tags.
     /// </summary>
     [Route("aika/api/configuration/[controller]")]
-    [Authorize(Policy = Authorization.Scopes.ManageTags)]
+    [Authorize(Policy = Authorization.Policies.ManageTags)]
     public class StateSetsController : Controller {
 
         /// <summary>

@@ -1,0 +1,153 @@
+root=true
+
+[*]
+end_of_line = crlf
+indent_style = space
+
+# Code files
+[*.{cs,csx,vb,vbx}]
+indent_size = 4
+insert_final_newline = true
+charset = utf-8-bom
+
+# Xml project files
+[*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,projitems,shproj}]
+indent_size = 2
+
+# Xml config files
+[*.{props,targets,ruleset,config,nuspec,resx,vsixmanifest,vsct}]
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_size = 2
+
+# Dotnet code style settings:
+[*.{cs,vb}]
+# Sort using and Import directives with System.* appearing first
+dotnet_sort_system_directives_first = true
+
+# Avoid "this." and "Me." if not necessary
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+# Use language keywords instead of framework type names for type references
+dotnet_style_predefined_type_for_locals_parameters_members = true:warning
+dotnet_style_predefined_type_for_member_access = false:warning
+
+# Require accessibility modifiers
+dotnet_style_require_accessibility_modifiers = always:error
+
+# Suggest more modern language features when available
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_coalesce_expression = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+dotnet_style_explicit_tuple_names = true:suggestion
+
+# CSharp code style settings:
+[*.cs]
+# Prefer "var" everywhere
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Prefer method-like constructs to have a block body
+csharp_style_expression_bodied_methods = false:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+csharp_style_expression_bodied_operators = false:suggestion
+
+# Prefer property-like constructs to have an expression-body
+csharp_style_expression_bodied_properties = false:suggestion
+csharp_style_expression_bodied_indexers = false:suggestion
+csharp_style_expression_bodied_accessors = false:suggestion
+
+# Suggest more modern language features when available
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_style_inlined_variable_declaration = true:suggestion
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+csharp_style_pattern_local_over_anonymous_function = true:suggestion
+
+# Newline settings
+csharp_new_line_before_open_brace = none:error
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+
+# == Naming conventions! ==
+
+# Require types and members to use PascalCase
+[*.{cs,vb}]
+dotnet_naming_rule.capitalise_types_and_members.symbols = types_and_members
+dotnet_naming_rule.capitalise_types_and_members.style = types_and_members_style
+dotnet_naming_rule.capitalise_types_and_members.severity = error
+
+dotnet_naming_symbols.types_and_members.applicable_kinds = class,struct,enum,property,method,event,delegate
+dotnet_naming_symbols.types_and_members.applicable_accessibilities = *
+
+dotnet_naming_style.types_and_members_style.capitalization = pascal_case
+
+# Require interfaces to start with I
+[*.{cs,vb}]
+dotnet_naming_rule.prefix_interfaces.symbols = interfaces
+dotnet_naming_rule.prefix_interfaces.style = interfaces_style
+dotnet_naming_rule.prefix_interfaces.severity = error
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_symbols.interfaces.applicable_accessibilities = *
+
+dotnet_naming_style.interfaces_style.required_prefix = I
+dotnet_naming_style.interfaces_style.capitalization = pascal_case
+
+# Require private fields (except consts) to start with _ and use camelCase
+[*.{cs,vb}]
+dotnet_naming_rule.private_fields_require_underscore_prefix.symbols = private_fields
+dotnet_naming_rule.private_fields_require_underscore_prefix.style = private_fields_style
+dotnet_naming_rule.private_fields_require_underscore_prefix.severity = error
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_fields.required_modifiers = abstract or must_inherit,async,readonly,static or shared
+
+dotnet_naming_style.private_fields_style.required_prefix = _
+dotnet_naming_style.private_fields_style.capitalization = camel_case
+
+# Require private consts to use PascalCase
+[*.{cs,vb}]
+dotnet_naming_rule.capitalise_private_consts.symbols = private_consts
+dotnet_naming_rule.capitalise_private_consts.style = private_consts_style
+dotnet_naming_rule.capitalise_private_consts.severity = error
+
+dotnet_naming_symbols.private_consts.applicable_kinds = field
+dotnet_naming_symbols.private_consts.applicable_accessibilities = private
+dotnet_naming_symbols.private_consts.required_modifiers = const
+
+dotnet_naming_style.private_consts_style.capitalization = pascal_case
+
+# Require non-private fields to use PascalCase
+[*.{cs,vb}]
+dotnet_naming_rule.capitalise_non_private_fields.symbols = non_private_fields
+dotnet_naming_rule.capitalise_non_private_fields.style = non_private_fields_style
+dotnet_naming_rule.capitalise_non_private_fields.severity = error
+
+dotnet_naming_symbols.non_private_fields.applicable_kinds = field
+dotnet_naming_symbols.non_private_fields.applicable_accessibilities = public,internal or friend,protected,protected_internal or protected_friend
+
+dotnet_naming_style.non_private_fields_style.capitalization = pascal_case
+
+# Require parameters to use camelCase
+[*.{cs,vb}]
+dotnet_naming_rule.parameters_use_camel_case.symbols = camel_case_parameters
+dotnet_naming_rule.parameters_use_camel_case.style = camel_case_parameters_style
+dotnet_naming_rule.parameters_use_camel_case.severity = error
+
+dotnet_naming_symbols.camel_case_parameters.applicable_kinds = parameter
+dotnet_naming_symbols.camel_case_parameters.applicable_accessibilities = *
+
+dotnet_naming_style.camel_case_parameters_style.capitalization = camel_case

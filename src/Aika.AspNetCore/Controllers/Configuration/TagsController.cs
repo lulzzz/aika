@@ -15,7 +15,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
     /// API controller for managing historian tags.
     /// </summary>
     [Route("aika/api/configuration/[controller]")]
-    [Authorize(Policy = Authorization.Scopes.ManageTags)]
+    [Authorize(Policy = Authorization.Policies.ManageTags)]
     public class TagsController : Controller {
 
         /// <summary>
@@ -225,7 +225,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 return BadRequest(); // 400
             }
         }
-
+        
 
         /// <summary>
         /// Deletes a tag.

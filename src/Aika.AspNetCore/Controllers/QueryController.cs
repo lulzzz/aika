@@ -16,7 +16,7 @@ namespace Aika.AspNetCore.Controllers {
     /// API controller for performing tag data queries.
     /// </summary>
     [Route("aika/api/[controller]")]
-    [Authorize(Policy = Authorization.Scopes.ReadTagData)]
+    [Authorize(Policy = Authorization.Policies.ReadTagData)]
     public class QueryController : Controller {
 
         /// <summary>

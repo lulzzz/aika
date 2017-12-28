@@ -29,7 +29,7 @@ namespace Aika {
         /// When implemented in a derived type, gets bespoke properties associated with the 
         /// <see cref="IHistorian"/> implementation.
         /// </summary>
-        IDictionary<string, string> Properties { get; }
+        IDictionary<string, object> Properties { get; }
 
     }
 

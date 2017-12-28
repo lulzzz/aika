@@ -76,7 +76,6 @@ namespace Aika {
         /// <summary>
         /// Gets the instantaneous snapshot value of the tag.
         /// </summary>
-        /// <rem
         public TagValue SnapshotValue {
             get { return _snapshotValue; }
             private set {
@@ -165,6 +164,17 @@ namespace Aika {
             };
 
             SnapshotValueUpdated += val => DataFilter.ValueReceived(val);
+        }
+
+
+        /// <summary>
+        /// Gets bespoke properties for the tag.  The default implementation of this method returns an empty dictionary.
+        /// </summary>
+        /// <returns>
+        /// A dictionary containing custom properties associated with the tag.
+        /// </returns>
+        public virtual IDictionary<string, object> GetProperties() {
+            return new Dictionary<string, object>();
         }
 
 

@@ -15,7 +15,7 @@ namespace Aika.AspNetCore.Controllers {
     /// API controller for performing operations on the Aika data stream.
     /// </summary>
     [Route("aika/api/[controller]")]
-    [Authorize(Policy = Authorization.Scopes.WriteTagData)]
+    [Authorize(Policy = Authorization.Policies.WriteTagData)]
     public class WriteController : Controller {
 
         /// <summary>

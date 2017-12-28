@@ -25,9 +25,14 @@ namespace Aika.Client.Dto {
         public string Description { get; set; }
 
         /// <summary>
+        /// Gets or sets the data functions that are supported by the historian.
+        /// </summary>
+        public HistorianDataFunctionDto[] SupportedFunctions { get; set; }
+
+        /// <summary>
         /// Gets or sets bespoke properties about the historian.
         /// </summary>
-        public IDictionary<string, string> Properties { get; set; }
+        public IDictionary<string, object> Properties { get; set; }
 
     }
 }

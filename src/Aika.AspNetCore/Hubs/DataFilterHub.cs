@@ -11,7 +11,10 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Aika.AspNetCore.Hubs {
 
-    [Authorize(Policy = Authorization.Scopes.Administrator)]
+    /// <summary>
+    /// SignalR hub for monitoring the exception and compression filter status for tags.
+    /// </summary>
+    [Authorize(Policy = Authorization.Policies.Administrator)]
     public class DataFilterHub : Hub {
 
         /// <summary>
@@ -25,11 +28,22 @@ namespace Aika.AspNetCore.Hubs {
         private readonly AikaHistorian _historian;
 
         
+        /// <summary>
+        /// Creates a new <see cref="DataFilterHub"/> object.
+        /// </summary>
+        /// <param name="historian">The Aika historian.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="historian"/> is <see langword="null"/>.</exception>
         public DataFilterHub(AikaHistorian historian) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
         }
 
 
+        /// <summary>
+        /// Called when a client connects to the hub.
+        /// </summary>
+        /// <returns>
+        /// A task that will process the connection.
+        /// </returns>
         public override Task OnConnectedAsync() {
             _subscriptions[Context.ConnectionId] = new ConcurrentDictionary<TagDefinition, Subscription>();
 
@@ -37,6 +51,13 @@ namespace Aika.AspNetCore.Hubs {
         }
 
 
+        /// <summary>
+        /// Called when a client disconnects from the hub.
+        /// </summary>
+        /// <param name="exception"></param>
+        /// <returns>
+        /// A task that will process the disconnection.
+        /// </returns>
         public override Task OnDisconnectedAsync(Exception exception) {
             if (_subscriptions.TryRemove(Context.ConnectionId, out var subscriptions)) {
                 foreach (var key in subscriptions.Keys.ToArray()) {
@@ -50,6 +71,14 @@ namespace Aika.AspNetCore.Hubs {
         }
 
 
+        /// <summary>
+        /// Subscribes the caller to receive exception and compression filter status updates for the 
+        /// specified tag names.
+        /// </summary>
+        /// <param name="tagNames">The tag names.</param>
+        /// <returns>
+        /// A task that will process the subscription request.
+        /// </returns>
         public async Task Subscribe(IEnumerable<string> tagNames) {
             var subscriptions = _subscriptions[Context.ConnectionId];
             var notSubscribed = tagNames.Where(x => !subscriptions.Keys.Any(t => t.Id.Equals(x) || t.Name.Equals(x, StringComparison.OrdinalIgnoreCase))).ToArray();
@@ -92,6 +121,14 @@ namespace Aika.AspNetCore.Hubs {
         }
 
 
+        /// <summary>
+        /// Creates a delegate that can be used to push exception filter status updates back to the 
+        /// calling client.
+        /// </summary>
+        /// <param name="tag">The tag that the delegate is for.</param>
+        /// <returns>
+        /// A new exception filter status update delegate.
+        /// </returns>
         private Action<ExceptionFilterResult> GetExceptionFilterValueProcessedHandler(TagDefinition tag) {
             var client = Clients.Client(Context.ConnectionId);
             return result => {
@@ -101,6 +138,14 @@ namespace Aika.AspNetCore.Hubs {
         }
 
 
+        /// <summary>
+        /// Creates a delegate that can be used to push compression filter status updates back to the 
+        /// calling client.
+        /// </summary>
+        /// <param name="tag">The tag that the delegate is for.</param>
+        /// <returns>
+        /// A new compression filter status update delegate.
+        /// </returns>
         private Action<CompressionFilterResult> GetCompressionFilterValueProcessedHandler(TagDefinition tag) {
             var client = Clients.Client(Context.ConnectionId);
             return result => {
@@ -110,6 +155,13 @@ namespace Aika.AspNetCore.Hubs {
         }
 
 
+        /// <summary>
+        /// Unsubscribes the caller from the specified tag names.
+        /// </summary>
+        /// <param name="tagNames">The tag names.</param>
+        /// <returns>
+        /// A task that will process the request.
+        /// </returns>
         public async Task Unsubscribe(IEnumerable<string> tagNames) {
             var subscriptions = _subscriptions[Context.ConnectionId];
             var subscribedTags = subscriptions.Keys.ToArray();
@@ -130,16 +182,29 @@ namespace Aika.AspNetCore.Hubs {
         }
 
 
+        /// <summary>
+        /// Subscription object that triggers an action when it is disposed.
+        /// </summary>
         private class Subscription : IDisposable {
 
+            /// <summary>
+            /// The disposed callback function.
+            /// </summary>
             private readonly Action _disposed;
 
 
+            /// <summary>
+            /// Creates a new <see cref="Subscription"/> object.
+            /// </summary>
+            /// <param name="onDisposed">The callback to invoke when the object is disposed.</param>
             internal Subscription(Action onDisposed) {
                 _disposed = onDisposed;
             }
 
 
+            /// <summary>
+            /// Disposes of the subscription and invokes its callback.
+            /// </summary>
             public void Dispose() {
                 _disposed?.Invoke();
             }

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -57,12 +58,13 @@ namespace Aika.SampleApp {
             }).AddJwtBearer(options => {
                 options.Authority = Configuration.GetValue<string>(JwtAuthoritySetting);
                 options.Audience = Configuration.GetValue<string>(JwtAudienceSetting);
-                // Allow SignalR websocket upgrades to be authenticated by putting the JWT in the 
+                // Allow Aika SignalR requests to be authenticated by putting the access token in the 
                 // query string.
                 options.Events = new JwtBearerEvents() {
                     OnMessageReceived = context => {
-                        if (context.Request.Path.Value.Contains("/aika/hubs/") && context.Request.Query.TryGetValue("token", out var value)) {
-                            context.Token = value;
+                        var token = context.Request.GetTokenFromAikaHubQueryString();
+                        if (token != null) {
+                            context.Token = token;
                         }
                         return Task.CompletedTask;
                     }
@@ -70,7 +72,7 @@ namespace Aika.SampleApp {
             });
 
             // Configure authorization based on scopes in the JWTs.
-            services.AddAikaAuthorizationScopePolicies(Configuration.GetValue<string>(JwtAuthoritySetting));
+            services.AddScopeBasedAikaAuthorizationPolicies(Configuration.GetValue<string>(JwtAuthoritySetting));
 
             // Register the Aika historian and the underlying implementation.
             services.AddAikaHistorian<Aika.Historians.InMemoryHistorian>();
@@ -83,6 +85,9 @@ namespace Aika.SampleApp {
 
             // Add SignalR.
             services.AddSignalR(x => x.JsonSerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter()));
+
+            // Add our sample data generator.
+            services.AddSingleton<IHostedService, SampleDataGenerator>();
         }
 
 
@@ -92,98 +97,14 @@ namespace Aika.SampleApp {
         /// <param name="app">The application builder.</param>
         /// <param name="env">The hosting envrionment.</param>
         public void Configure(IApplicationBuilder app, IHostingEnvironment env) {
-            AddTestTagData(app.ApplicationServices);
-
             if (env.IsDevelopment()) {
                 app.UseDeveloperExceptionPage();
             }
 
             app.UseAuthentication();
-
             app.UseMvc();
             app.UseSignalR(x => x.MapAikaHubs()); // Make sure that the Aika hubs are mapped.
         }
 
-
-        /// <summary>
-        /// Gets an internal identity that represents the Aika system account.
-        /// </summary>
-        /// <returns>
-        /// A <see cref="System.Security.Claims.ClaimsPrincipal"/> that represents the Aika system 
-        /// account.
-        /// </returns>
-        private System.Security.Claims.ClaimsPrincipal GetSystemIdentity() {
-            var identity = new System.Security.Claims.ClaimsIdentity("AikaSystem");
-            return new System.Security.Claims.ClaimsPrincipal(identity);
-        }
-
-
-        /// <summary>
-        /// Creates test tag data and adds it to the Aika historian.
-        /// </summary>
-        /// <param name="serviceProvider">The service provider.</param>
-        private void AddTestTagData(IServiceProvider serviceProvider) {
-            var taskRunner = serviceProvider.GetService<ITaskRunner>();
-            var historian = serviceProvider.GetService<AikaHistorian>();
-            var log = serviceProvider.GetService<ILoggerFactory>().CreateLogger<Startup>();
-
-            taskRunner.RunBackgroundTask(async ct => {
-                var identity = GetSystemIdentity();
-
-                var now = DateTime.UtcNow;
-                var start = now.AddDays(-1);
-
-                var tag = await historian.CreateTag(identity,
-                                                    new TagDefinitionUpdate() {
-                                                        Name = "Sinusoid",
-                                                        Description = $"12 hour sinusoid wave (starting at {start:dd-MMM-yy HH:mm:ss} UTC)",
-                                                        DataType = TagDataType.FloatingPoint,
-                                                        ExceptionFilterSettings = new TagValueFilterSettingsUpdate() {
-                                                            IsEnabled = true,
-                                                            LimitType = TagValueFilterDeviationType.Absolute,
-                                                            Limit = 0.1,
-                                                            WindowSize = TimeSpan.FromDays(1)
-                                                        },
-                                                        CompressionFilterSettings = new TagValueFilterSettingsUpdate() {
-                                                            IsEnabled = true,
-                                                            LimitType = TagValueFilterDeviationType.Absolute,
-                                                            Limit = 0.15,
-                                                            WindowSize = TimeSpan.FromDays(1)
-                                                        }
-                                                    },
-                                                    ct).ConfigureAwait(false);
-
-                log.LogDebug($"Created tag \"{tag.Name}\" ({tag.Id}).");
-
-                var samples = new List<TagValue>();
-                var wavePeriod = TimeSpan.FromHours(12).Ticks;
-
-                Func<double, double, double, double> waveFunc = (time, period, amplitude) => {
-                    return amplitude * (Math.Sin(2 * Math.PI * (1 / period) * (time % period)));
-                };
-
-                for (var sampleTime = start; sampleTime <= now; sampleTime = sampleTime.Add(TimeSpan.FromMinutes(1))) {
-                    var value = waveFunc(sampleTime.Ticks, wavePeriod, 50);
-                    samples.Add(new TagValue(sampleTime, value, null, TagValueQuality.Good, null));
-                }
-
-                await historian.WriteTagData(identity, new Dictionary<string, IEnumerable<TagValue>>() { { tag.Name, samples } }, ct).ConfigureAwait(false);
-
-                do {
-                    await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);
-                    if (ct.IsCancellationRequested) {
-                        break;
-                    }
-
-                    var sampleTime = DateTime.UtcNow;
-                    var value = waveFunc(sampleTime.Ticks, wavePeriod, 50);
-                    var snapshot = new TagValue(sampleTime, value, null, TagValueQuality.Good, null);
-
-                    taskRunner.RunBackgroundTask(ct2 => historian.WriteTagData(identity, new Dictionary<string, IEnumerable<TagValue>>() { { tag.Name, new[] { snapshot } } }, ct2));
-                }
-                while (!ct.IsCancellationRequested);
-
-            });
-        }
     }
 }

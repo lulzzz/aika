@@ -12,7 +12,7 @@ namespace Aika.AspNetCore {
     /// <see cref="IHostedService"/> that allows Aika to run background tasks that can be tracked by 
     /// the ASP.NET Core application.
     /// </summary>
-    public class TaskRunner : IHostedService, ITaskRunner, IDisposable {
+    public class TaskRunner : HostedService, ITaskRunner{
 
         /// <summary>
         /// Logging.
@@ -36,51 +36,6 @@ namespace Aika.AspNetCore {
         /// <param name="logger">The logger to use.</param>
         public TaskRunner(ILogger<TaskRunner> logger) {
             _log = logger;
-        }
-
-
-        /// <summary>
-        /// Starts the hosted service.
-        /// </summary>
-        /// <param name="cancellationToken">A cancellation token that can be used to end the startup task.</param>
-        /// <returns>
-        /// A task that will complete when <paramref name="cancellationToken"/> is cancelled.
-        /// </returns>
-        public Task StartAsync(CancellationToken cancellationToken) {
-            _log?.LogInformation("Startup requested.");
-            return Task.Delay(-1, cancellationToken);
-        }
-
-
-        /// <summary>
-        /// Stops the hosted service.
-        /// </summary>
-        /// <param name="cancellationToken">
-        ///   A cancellation token that will fire when the graceful shutdown period for running 
-        ///   tasks has expired.
-        /// </param>
-        /// <returns>
-        /// A task that will complete when all background tasks have completed, or when 
-        /// <paramref name="cancellationToken"/> fires (whichever occurs first).
-        /// </returns>
-        public async Task StopAsync(CancellationToken cancellationToken) {
-            if (_cancellationTokenSource.IsCancellationRequested) {
-                return;
-            }
-
-            _log?.LogInformation("Shutdown requested.");
-            Task[] tasks;
-
-            try {
-                _cancellationTokenSource.Cancel();
-            }
-            finally {
-                tasks = _tasks.Keys.ToArray();
-            }
-
-            var remainingTasks = Task.WhenAll(tasks);
-            await Task.WhenAny(remainingTasks, Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
-
         }
 
 
@@ -117,11 +72,37 @@ namespace Aika.AspNetCore {
 
 
         /// <summary>
-        /// Disposes of the <see cref="TaskRunner"/> by informing all background tasks to shut down.
+        /// Runs the task runner.
         /// </summary>
-        public void Dispose() {
-            _cancellationTokenSource.Dispose();
-        }
+        /// <param name="cancellationToken">The cancellation token that is used to trigger a shutdown of the task runner.</param>
+        /// <returns>
+        /// The task runner's service task.
+        /// </returns>
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken) {
+            _log?.LogInformation("Startup requested.");
 
+            cancellationToken.Register(() => {
+                _log?.LogInformation("Shutdown requested.");
+                _cancellationTokenSource.Cancel();
+            });
+
+            try {
+                await Task.Delay(-1, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) {
+                // No special error handling required - we're shutting down.
+            }
+
+            Task[] pendingTasks;
+
+            try {
+                _cancellationTokenSource.Cancel();
+            }
+            finally {
+                pendingTasks = _tasks.Keys.ToArray();
+            }
+
+            await Task.WhenAll(pendingTasks).ConfigureAwait(false);
+        }
     }
 }

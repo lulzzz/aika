@@ -62,14 +62,14 @@ namespace Aika.AspNetCore.Controllers {
         /// </returns>
         [HttpGet]
         [Route("extended")]
-        [Authorize(Policy = Authorization.Scopes.Administrator)]
+        [Authorize(Policy = Authorization.Policies.Administrator)]
         [ProducesResponseType(200, Type = typeof(AikaInfoDto))]
         public async Task<IActionResult> GetInfoExtended(CancellationToken cancellationToken) {
             var result = new AikaInfoExtendedDto() {
                 UtcStartupTime = _historian.UtcStartupTime,
                 Version = _historian.GetType().Assembly?.GetName().Version.ToString(),
                 Properties = new Dictionary<string, string>(),
-                Historian = _historian.Historian.ToHistorianInfoDto()
+                Historian = await _historian.ToHistorianInfoDto(cancellationToken).ConfigureAwait(false)
             };
 
             return Ok(result); // 200

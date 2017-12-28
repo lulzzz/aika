@@ -31,5 +31,10 @@ namespace Aika.Client.Dto {
         /// </summary>
         public DateTime UtcLastModifiedAt { get; set; }
 
+        /// <summary>
+        /// Gets or sets bespoke properties for the tag.
+        /// </summary>
+        public IDictionary<string, object> Properties { get; set; }
+
     }
 }

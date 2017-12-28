@@ -11,7 +11,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.SampleApp", "Aika.Samp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.AspNetCore", "Aika.AspNetCore\Aika.AspNetCore.csproj", "{BEC0FBBA-4516-48F0-BB39-CE645F6B2217}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aika.Client", "Aika.Client\Aika.Client.csproj", "{3326AF72-1E4F-4E24-A971-31C097E86CA6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.Client", "Aika.Client\Aika.Client.csproj", "{3326AF72-1E4F-4E24-A971-31C097E86CA6}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{17FA93D8-CAFC-49C1-AEEA-510621BE0830}"
+	ProjectSection(SolutionItems) = preProject
+		..\.editorconfig = ..\.editorconfig
+		..\.gitignore = ..\.gitignore
+		..\readme.md = ..\readme.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

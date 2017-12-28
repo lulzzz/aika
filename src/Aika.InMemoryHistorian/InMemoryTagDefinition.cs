@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,9 +13,16 @@ namespace Aika.Historians {
 
         private readonly InMemoryHistorian _historian;
 
+        internal ConcurrentDictionary<string, object> Properties { get; } = new ConcurrentDictionary<string, object>();
+
 
         internal InMemoryTagDefinition(InMemoryHistorian historian, ITaskRunner taskRunner, string id, string name, string description, string units, TagDataType dataType, string stateSet, TagValueFilterSettings exceptionFilterSettings, TagValueFilterSettings compressionFilterSettings, ILoggerFactory loggerFactory) : base(historian, taskRunner, id, name, description, units, dataType, stateSet, exceptionFilterSettings, compressionFilterSettings, null, null, null, null, loggerFactory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
+        }
+
+
+        public override IDictionary<string, object> GetProperties() {
+            return Properties.ToDictionary(x => x.Key, x => x.Value);
         }
 
 

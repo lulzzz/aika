@@ -2,23 +2,41 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Aika.Client.Dto;
 
 namespace Aika.AspNetCore {
     internal static class DtoExtensions {
 
-        internal static HistorianInfoDto ToHistorianInfoDto(this IHistorian historian) {
+        internal static async Task<HistorianInfoDto> ToHistorianInfoDto(this AikaHistorian historian, CancellationToken cancellationToken) {
             if (historian == null) {
                 return null;
             }
 
+            var supportedFunctions = await historian.GetAvailableDataQueryFunctions(cancellationToken).ConfigureAwait(false);
+
             return new HistorianInfoDto() {
-                TypeName = historian.GetType().FullName,
-                Version = historian.GetType().Assembly?.GetName()?.Version.ToString(),
-                Description = historian.Description,
-                Properties = historian.Properties == null
-                ? new Dictionary<string, string>()
-                : new Dictionary<string, string>(historian.Properties)
+                TypeName = historian.Historian.GetType().FullName,
+                Version = historian.Historian.GetType().Assembly?.GetName()?.Version.ToString(),
+                Description = historian.Historian.Description,
+                SupportedFunctions = supportedFunctions.Select(x => x.ToHistorianDataFunctionDto()).ToArray(),
+                Properties = historian.Historian.Properties == null
+                ? new Dictionary<string, object>()
+                : new Dictionary<string, object>(historian.Historian.Properties)
+            };
+        }
+
+
+        internal static HistorianDataFunctionDto ToHistorianDataFunctionDto(this DataQueryFunction func) {
+            if (func == null) {
+                throw new ArgumentNullException(nameof(func));
+            }
+
+            return new HistorianDataFunctionDto() {
+                Name = func.Name,
+                Description = func.Description,
+                IsNativeFunction = func.IsNativeFuction
             };
         }
 
@@ -125,7 +143,8 @@ namespace Aika.AspNetCore {
                 ExceptionFilterSettings = tagDefinition.DataFilter.ExceptionFilter.Settings.ToTagValueFilterSettingsDto(),
                 CompressionFilterSettings = tagDefinition.DataFilter.CompressionFilter.Settings.ToTagValueFilterSettingsDto(),
                 UtcCreatedAt = tagDefinition.UtcCreatedAt,
-                UtcLastModifiedAt = tagDefinition.UtcLastModifiedAt
+                UtcLastModifiedAt = tagDefinition.UtcLastModifiedAt,
+                Properties = new Dictionary<string, object>(tagDefinition.GetProperties())
             };
         }
 
