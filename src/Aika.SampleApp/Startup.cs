@@ -78,10 +78,7 @@ namespace Aika.SampleApp {
             services.AddAikaHistorian<Aika.Historians.InMemoryHistorian>();
 
             // Add MVC and register the Aika-specific routes.
-            services.AddMvc().AddAikaRoutes().AddJsonOptions(x => {
-                x.SerializerSettings.Formatting = Newtonsoft.Json.Formatting.Indented;
-                x.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
-            });
+            services.AddMvc().AddAikaRoutes();
 
             // Add SignalR.
             services.AddSignalR(x => x.JsonSerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter()));
