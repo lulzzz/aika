@@ -81,7 +81,7 @@ namespace Aika.SampleApp {
             services.AddMvc().AddAikaRoutes();
 
             // Add SignalR.
-            services.AddSignalR(x => x.JsonSerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter()));
+            services.AddSignalR();
 
             // Add our sample data generator.
             services.AddSingleton<IHostedService, SampleDataGenerator>();
