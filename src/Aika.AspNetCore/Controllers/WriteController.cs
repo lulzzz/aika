@@ -60,7 +60,7 @@ namespace Aika.AspNetCore.Controllers {
                 return StatusCode(204); // 204
             }
             catch (SecurityException) {
-                return Unauthorized(); // 401
+                return Forbid(); // 403
             }
             catch (NotSupportedException) {
                 return BadRequest(); // 400
@@ -98,7 +98,7 @@ namespace Aika.AspNetCore.Controllers {
                 return StatusCode(204); // 204
             }
             catch (SecurityException) {
-                return Unauthorized(); // 401
+                return Forbid(); // 403
             }
             catch (NotSupportedException) {
                 return BadRequest(); // 400

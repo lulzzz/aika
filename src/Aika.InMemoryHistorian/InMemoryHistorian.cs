@@ -135,7 +135,7 @@ namespace Aika.Historians {
                             ? MaxRawSampleCount
                             : pointCount.Value
                         : MaxRawSampleCount;
-                    var selected = rawData.Values.Where(x => x.UtcSampleTime >= utcStartTime && x.UtcSampleTime <= utcEndTime).Take(take);
+                    var selected = rawData.Values.Concat(tag.SnapshotValue == null ? new TagValue[0] : new[] { tag.SnapshotValue }).Where(x => x.UtcSampleTime >= utcStartTime && x.UtcSampleTime <= utcEndTime).Take(take);
 
                     result[tag.Name] = new TagValueCollection() {
                         Values = selected.ToArray(),

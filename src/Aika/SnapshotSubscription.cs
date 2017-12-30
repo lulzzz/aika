@@ -80,6 +80,10 @@ namespace Aika {
 
                 _valueReceivedHandlers[item.Id] = onValueReceived;
 
+                if (item.SnapshotValue != null) {
+                    onValueReceived.Invoke(item.SnapshotValue);
+                }
+
                 item.SnapshotValueUpdated += onValueReceived;
                 item.Deleted += UnsubscribeTag;
             }

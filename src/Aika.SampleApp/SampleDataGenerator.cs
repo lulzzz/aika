@@ -96,8 +96,14 @@ namespace Aika.SampleApp {
         /// A <see cref="System.Security.Claims.ClaimsPrincipal"/> that represents the Aika system 
         /// account.
         /// </returns>
-        private System.Security.Claims.ClaimsPrincipal GetSystemIdentity() {
+        internal static System.Security.Claims.ClaimsPrincipal GetSystemIdentity() {
             var identity = new System.Security.Claims.ClaimsIdentity("AikaSystem");
+
+            identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Aika.AspNetCore.Authorization.Policies.Administrator));
+            identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Aika.AspNetCore.Authorization.Policies.ManageTags));
+            identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Aika.AspNetCore.Authorization.Policies.ReadTagData));
+            identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Aika.AspNetCore.Authorization.Policies.WriteTagData));
+
             return new System.Security.Claims.ClaimsPrincipal(identity);
         }
 
