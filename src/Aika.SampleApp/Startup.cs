@@ -51,33 +51,28 @@ namespace Aika.SampleApp {
         public void ConfigureServices(IServiceCollection services) {
             services.AddLogging(x => x.AddConsole().AddDebug());
 
-            //// Configure JWT authentication.
-            //services.AddAuthentication(options => {
-            //    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-            //    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            //}).AddJwtBearer(options => {
-            //    options.Authority = Configuration.GetValue<string>(JwtAuthoritySetting);
-            //    options.Audience = Configuration.GetValue<string>(JwtAudienceSetting);
-            //    // Allow Aika SignalR requests to be authenticated by putting the access token in the 
-            //    // query string.
-            //    options.Events = new JwtBearerEvents() {
-            //        OnMessageReceived = context => {
-            //            var token = context.Request.GetTokenFromAikaHubQueryString();
-            //            if (token != null) {
-            //                context.Token = token;
-            //            }
-            //            return Task.CompletedTask;
-            //        }
-            //    };
-            //});
-
-            //// Configure authorization based on scopes in the JWTs.
-            //services.AddScopeBasedAikaAuthorizationPolicies(Configuration.GetValue<string>(JwtAuthoritySetting));
-
-            //services.AddAuthentication(Microsoft.AspNetCore.Server.IISIntegration.IISDefaults.AuthenticationScheme);
-            services.AddAikaAuthorizationPolicies((policyName, policyBuilder) => {
-                policyBuilder.RequireRole(policyName);
+            // Configure JWT authentication.
+            services.AddAuthentication(options => {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            }).AddJwtBearer(options => {
+                options.Authority = Configuration.GetValue<string>(JwtAuthoritySetting);
+                options.Audience = Configuration.GetValue<string>(JwtAudienceSetting);
+                // Allow Aika SignalR requests to be authenticated by putting the access token in the 
+                // query string.
+                options.Events = new JwtBearerEvents() {
+                    OnMessageReceived = context => {
+                        var token = context.Request.GetTokenFromAikaHubQueryString();
+                        if (token != null) {
+                            context.Token = token;
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
             });
+
+            // Configure authorization based on scopes in the JWTs.
+            services.AddScopeBasedAikaAuthorizationPolicies(Configuration.GetValue<string>(JwtAuthoritySetting));
 
             // Register the Aika historian and the underlying implementation.
             services.AddAikaHistorian<Aika.Historians.InMemoryHistorian>();
