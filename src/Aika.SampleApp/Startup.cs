@@ -102,7 +102,7 @@ namespace Aika.SampleApp {
                 app.UseDeveloperExceptionPage();
             }
 
-            //app.UseAuthentication();
+            app.UseAuthentication();
             app.Use((context, next) => {
                 context.User = SampleDataGenerator.GetSystemIdentity();
                 return next();
