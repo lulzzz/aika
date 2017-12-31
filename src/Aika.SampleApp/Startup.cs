@@ -89,7 +89,7 @@ namespace Aika.SampleApp {
             services.AddSignalR();
 
             //// Add our sample data generator.
-            //services.AddSingleton<IHostedService, SampleDataGenerator>();
+            services.AddSingleton<IHostedService, SampleDataGenerator>();
 
             services.AddSwaggerGen(x => {
                 x.SwaggerDoc("v1", new Swashbuckle.AspNetCore.Swagger.Info { Title = "Aika API", Version = "v1" });
