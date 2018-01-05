@@ -26,4 +26,4 @@ Aika includes built-in support for aggregation of raw data for historian impleme
 
 When values are written to Aika, exception and compression filters are applied to the incoming values, to reduce the volume of data that is actually recorded, while maintaining the shape of the data (and ensuring that meaningful value changes are recorded).
 
-The wiki [describes this](https://github.com/wazzamatazz/aika/wiki/Exception-and-Compression-Filtering) in more detail.
+The wiki [describes this](https://github.com/wazzamatazz/aika/wiki/Exception-and-Compression-Filtering) in more detail. 

@@ -87,8 +87,7 @@ namespace Aika.Client {
         /// Note that all units are case insensitive and white space in the string is ignored.
         /// </remarks>
         public static bool IsRelativeDateTime(this string s) {
-            Match m;
-            return IsRelativeDateTime(s, out m);
+            return IsRelativeDateTime(s, out var m);
         }
 
 
@@ -99,12 +98,8 @@ namespace Aika.Client {
         /// <param name="formatProvider">An <see cref="IFormatProvider"/> to use when parsing dates.</param>
         /// <param name="dateTimeStyle">A <see cref="DateTimeStyles"/> instance specifying flags to use while parsing dates.</param>
         /// <returns><see langword="true"/> if the string is a valid absolute time stamp, otherwise <see langword="false"/>.</returns>
-        /// <remarks>
-        /// Timestamps are parsed using the <see cref="DateTime.TryParse"/> method.
-        /// </remarks>
         public static bool IsAbsoluteDateTime(this string s, IFormatProvider formatProvider, DateTimeStyles dateTimeStyle) {
-            DateTime d;
-            return DateTime.TryParse(s, formatProvider, dateTimeStyle, out d);
+            return DateTime.TryParse(s, formatProvider, dateTimeStyle, out var d);
         }
 
 
@@ -114,8 +109,7 @@ namespace Aika.Client {
         /// <param name="s">The string.</param>
         /// <returns><see langword="true"/> if the string is a valid absolute time stamp, otherwise <see langword="false"/>.</returns>
         public static bool IsNumericDateTime(this string s) {
-            double d;
-            return Double.TryParse(s, out d);
+            return Double.TryParse(s, out var d);
         }
 
 
@@ -152,8 +146,7 @@ namespace Aika.Client {
         /// <param name="dateTimeStyle">A <see cref="DateTimeStyles"/> instance specifying flags to use while parsing dates.</param>
         /// <returns><see langword="true"/> if the string is a valid time stamp, otherwise <see langword="false"/>.</returns>
         public static bool IsDateTime(this string s, IFormatProvider formatProvider, DateTimeStyles dateTimeStyle) {
-            Match m;
-            return IsDateTime(s, formatProvider, dateTimeStyle, out m);
+            return IsDateTime(s, formatProvider, dateTimeStyle, out var m);
         }
 
 
@@ -163,15 +156,14 @@ namespace Aika.Client {
         /// <param name="s">The string</param>
         /// <returns><see langword="true"/> if the string is a valid time stamp, otherwise <see langword="false"/>.</returns>
         public static bool IsDateTime(this string s) {
-            Match m;
-            return IsDateTime(s, null, DateTimeStyles.None, out m);
+            return IsDateTime(s, null, DateTimeStyles.None, out var m);
         }
 
 
         /// <summary>
         /// Converts an absolute or relative time stamp string into a UTC <see cref="DateTime"/> instance.
         /// </summary>
-        /// <param name="s">The <see cref="string"/> to convert.</param>
+        /// <param name="s">The <see cref="String"/> to convert.</param>
         /// <param name="formatProvider">The <see cref="IFormatProvider"/> to use when parsing absolute dates.</param>
         /// <returns>A <see cref="DateTime"/> representing the time stamp string.</returns>
         /// <exception cref="FormatException">The string is not a valid absolute or relative time stamp.</exception>
@@ -212,10 +204,12 @@ namespace Aika.Client {
         ///     </item>
         /// </list>
         /// 
+        /// <para>
         /// Note that all units are case insensitive and white space in the string is ignored.
+        /// </para>
         /// 
         /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
+        /// Relative time stamps will use <see cref="DateTime.UtcNow"/> as the base date.
         /// </para>
         /// 
         /// </remarks>
@@ -224,17 +218,14 @@ namespace Aika.Client {
                 throw new FormatException("Invalid time stamp.");
             }
 
-            Match m;
-
             var baseDate = DateTime.UtcNow;
             var dateTimeStyle = DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal;
 
-            if (!IsDateTime(s, formatProvider, dateTimeStyle, out m)) {
+            if (!IsDateTime(s, formatProvider, dateTimeStyle, out var m)) {
                 throw new FormatException("Invalid time stamp.");
             }
 
-            double milliseconds;
-            if (Double.TryParse(s, out milliseconds)) {
+            if (Double.TryParse(s, out var milliseconds)) {
                 return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(milliseconds);
             }
 
@@ -258,7 +249,7 @@ namespace Aika.Client {
         /// <summary>
         /// Converts an absolute or relative time stamp string into a <see cref="DateTime"/> instance.
         /// </summary>
-        /// <param name="s">The <see cref="string"/> to convert.</param>
+        /// <param name="s">The <see cref="String"/> to convert.</param>
         /// <returns>A <see cref="DateTime"/> representing the time stamp string.</returns>
         /// <exception cref="FormatException">The string is not a valid absolute or relative time stamp.</exception>
         /// <remarks>
@@ -298,14 +289,12 @@ namespace Aika.Client {
         ///     </item>
         /// </list>
         /// 
-        /// Note that all units are case insensitive and white space in the string is ignored.
-        /// 
         /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
+        /// Note that all units are case insensitive and white space in the string is ignored.
         /// </para>
         /// 
         /// <para>
-        /// Relative time stamps will use <see cref="DateTime.Now"/> as the base date.
+        /// Relative time stamps will use <see cref="DateTime.UtcNow"/> as the base date.
         /// </para>
         /// 
         /// </remarks>
@@ -318,12 +307,57 @@ namespace Aika.Client {
         /// Attempts to parse the specified absolute or relative time stamp literal into a UTC <see cref="DateTime"/> instance using the specified settings.
         /// </summary>
         /// <param name="s">The time stamp literal.</param>
-        /// <param name="baseDate">The base date to use when parsing a relative time stamp.</param>
         /// <param name="formatProvider">The <see cref="IFormatProvider"/> to use when parsing absolute dates.</param>
         /// <param name="dateTime">The parsed date.</param>
         /// <returns>
         /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
         /// </returns>
+        /// /// <remarks>
+        /// Relative time stamps are specified in the format <c>* - [duration][unit]</c> or <c>* + [duration][unit]</c> 
+        /// where <c>*</c> represents the current time, <c>[duration]</c> is a number greater than or equal to zero and 
+        /// <c>[unit]</c> is the unit that the duration is measured in.  Integer and floating point durations are both 
+        /// valid.  The following units are valid:
+        /// 
+        /// <list type="table">
+        ///     <listheader>
+        ///         <term>Unit</term>
+        ///         <description>Description</description>
+        ///     </listheader>
+        ///     <item>
+        ///         <term>ms</term>
+        ///         <description>milliseconds</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>s</term>
+        ///         <description>seconds</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>m</term>
+        ///         <description>minutes</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>h</term>
+        ///         <description>hours</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>d</term>
+        ///         <description>days</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>y</term>
+        ///         <description>years (1y == 365d)</description>
+        ///     </item>
+        /// </list>
+        /// 
+        /// <para>
+        /// Note that all units are case insensitive and white space in the string is ignored.
+        /// </para>
+        /// 
+        /// <para>
+        /// Relative time stamps will use <see cref="DateTime.UtcNow"/> as the base date.
+        /// </para>
+        /// 
+        /// </remarks>
         public static bool TryConvertToUtcDateTime(this string s, IFormatProvider formatProvider, out DateTime dateTime) {
             try {
                 dateTime = ToUtcDateTime(s, formatProvider);
@@ -341,7 +375,6 @@ namespace Aika.Client {
         /// instance using the specified settings.
         /// </summary>
         /// <param name="s">The time stamp literal.</param>
-        /// <param name="baseDate">The base date to use when parsing a relative time stamp.</param>
         /// <param name="dateTime">The parsed date.</param>
         /// <returns>
         /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
@@ -383,10 +416,12 @@ namespace Aika.Client {
         ///     </item>
         /// </list>
         /// 
+        /// <para>
         /// Note that all units are case insensitive and white space in the string is ignored.
+        /// </para>
         /// 
         /// <para>
-        /// Absolute time stamps are parsed using the <see cref="DateTime.TryParse"/> method.
+        /// Relative time stamps will use <see cref="DateTime.UtcNow"/> as the base date.
         /// </para>
         /// 
         /// </remarks>
@@ -407,17 +442,16 @@ namespace Aika.Client {
         /// </summary>
         /// <param name="s">The string</param>
         /// <param name="m">A regular expression match for the string</param>
-        /// <returns><see langword="true"/> if the string is a valid time span, otherwise <see langword="false"/>.</returns>
+        /// <returns>
+        /// <see langword="true"/> if the string is a valid time span, otherwise <see langword="false"/>.
+        /// </returns>
         /// <remarks>
         /// If the string can be successfully parsed as a literal time span, <paramref name="m"/> will be null.
         /// </remarks>
         private static bool IsTimeSpan(string s, out Match m) {
-            // Need to put start/end position anchors around TimeSpan regex pattern (these are missing so that 
-            // RelativeDateRegexPattern can use TimeSpanRegexPattern).
             var timeSpanRegex = new Regex(TimeSpanRegexPattern, RegexOptions.IgnoreCase);
-            TimeSpan t;
 
-            if (TimeSpan.TryParse(s, out t)) {
+            if (TimeSpan.TryParse(s, out var t)) {
                 m = null;
                 return true;
             }
@@ -431,10 +465,11 @@ namespace Aika.Client {
         /// Determines whether a string is a valid longhand or shorthand time span literal.
         /// </summary>
         /// <param name="s">The string</param>
-        /// <returns><see langword="true"/> if the string is a valid time span, otherwise <see langword="false"/>.</returns>
+        /// <returns>
+        /// <see langword="true"/> if the string is a valid time span, otherwise <see langword="false"/>.
+        /// </returns>
         public static bool IsTimeSpan(this string s) {
-            Match m;
-            return IsTimeSpan(s, out m);
+            return IsTimeSpan(s, out var m);
         }
 
 
@@ -480,15 +515,16 @@ namespace Aika.Client {
         /// <summary>
         /// Converts a longhand or shorthand time span literal into a <see cref="TimeSpan"/> instance.
         /// </summary>
-        /// <param name="s">The <see cref="string"/> to convert.</param>
+        /// <param name="s">The <see cref="String"/> to convert.</param>
         /// <returns>A <see cref="DateTime"/> representing the timespan string.</returns>
         /// <exception cref="FormatException">The string is not a valid timespan.</exception>
         /// <remarks>
-        /// Initially, the method will attempt to parse the string using the <see cref="M:TimeSpan.TryParse"/> method.  This 
-        /// ensures that standard timespan literals (e.g. <c>"365.00:00:00"</c>) are parsed in the standard way.  If the string 
-        /// cannot be parsed in this way, it is tested to see if it is in the format <c>[duration][unit]</c> where 
-        /// <c>[duration]</c> is an integer greater than or equal to zero and <c>[unit]</c> is the unit that the duration is 
-        /// measured in.  The following units are valid:
+        /// Initially, the method will attempt to parse the string using the <see cref="TimeSpan.TryParse(String, IFormatProvider, out TimeSpan)"/> 
+        /// method.  This ensures that standard time span literals (e.g. <c>"365.00:00:00"</c>) are 
+        /// parsed in the standard way.  If the string cannot be parsed in this way, it is tested to 
+        /// see if it is in the format <c>[duration][unit]</c>, where <c>[duration]</c> is an integer 
+        /// greater than or equal to zero and <c>[unit]</c> is the unit that the duration is measured 
+        /// in.  The following units are valid:
         /// 
         /// <list type="table">
         ///     <listheader>
@@ -546,11 +582,12 @@ namespace Aika.Client {
         /// <see langword="true"/> if the literal was successfully parsed, otherwise <see langword="false"/>.
         /// </returns>
         /// <remarks>
-        /// Initially, the method will attempt to parse the string using the <see cref="M:TimeSpan.TryParse"/> method.  This 
-        /// ensures that standard timespan literals (e.g. <c>"365.00:00:00"</c>) are parsed in the standard way.  If the string 
-        /// cannot be parsed in this way, it is tested to see if it is in the format <c>[duration][unit]</c> where 
-        /// <c>[duration]</c> is an integer greater than or equal to zero and <c>[unit]</c> is the unit that the duration is 
-        /// measured in.  The following units are valid:
+        /// Initially, the method will attempt to parse the string using the <see cref="TimeSpan.TryParse(String, IFormatProvider, out TimeSpan)"/> 
+        /// method.  This ensures that standard time span literals (e.g. <c>"365.00:00:00"</c>) are 
+        /// parsed in the standard way.  If the string cannot be parsed in this way, it is tested to 
+        /// see if it is in the format <c>[duration][unit]</c>, where <c>[duration]</c> is an integer 
+        /// greater than or equal to zero and <c>[unit]</c> is the unit that the duration is measured 
+        /// in.  The following units are valid:
         /// 
         /// <list type="table">
         ///     <listheader>

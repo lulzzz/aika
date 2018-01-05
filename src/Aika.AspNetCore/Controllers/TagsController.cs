@@ -17,7 +17,7 @@ namespace Aika.AspNetCore.Controllers {
     /// </summary>
     [Route("aika/api/[controller]")]
     [Authorize(Policy = Authorization.Policies.ReadTagData)]
-    public class QueryController : Controller {
+    public class TagsController : Controller {
 
         /// <summary>
         /// Aika historian instance.
@@ -26,11 +26,11 @@ namespace Aika.AspNetCore.Controllers {
 
 
         /// <summary>
-        /// Creates a new <see cref="QueryController"/> object.
+        /// Creates a new <see cref="TagsController"/> object.
         /// </summary>
         /// <param name="historian">The Aika historian instance.</param>
         /// <exception cref="ArgumentNullException"><paramref name="historian"/> is <see langword="null"/>.</exception>
-        public QueryController(AikaHistorian historian) {
+        public TagsController(AikaHistorian historian) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
         }
 
@@ -44,7 +44,7 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a page of matching search results.
         /// </returns>
         [HttpPost]
-        [Route("tags")]
+        [Route("")]
         [ProducesResponseType(200, Type = typeof(IEnumerable<TagDefinitionDto>))]
         public async Task<IActionResult> GetTags([FromBody] TagSearchRequest request, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
@@ -86,7 +86,7 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a page of matching search results.
         /// </returns>
         [HttpGet]
-        [Route("tags")]
+        [Route("")]
         [ProducesResponseType(200, Type = typeof(IEnumerable<TagDefinitionDto>))]
         public Task<IActionResult> GetTags(CancellationToken cancellationToken, string name = null, string description = null, string units = null, int pageSize = 10, int page = 1) {
             var model = new TagSearchRequest() {
@@ -111,7 +111,7 @@ namespace Aika.AspNetCore.Controllers {
         /// The content of a successful response will be the defined state sets, indexed by set name.
         /// </returns>
         [HttpGet]
-        [Route("tags/statesets")]
+        [Route("statesets")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, StateSetDto>))]
         public async Task<IActionResult> GetStateSets(CancellationToken cancellationToken) {
             try {
@@ -145,7 +145,7 @@ namespace Aika.AspNetCore.Controllers {
         /// The content of a successful response will be the requested state set definition.
         /// </returns>
         [HttpGet]
-        [Route("tags/statesets/{name}")]
+        [Route("statesets/{name}")]
         [ProducesResponseType(200, Type = typeof(StateSetDto))]
         public async Task<IActionResult> GetStateSet([FromRoute] string name, CancellationToken cancellationToken) {
             try {
@@ -182,7 +182,7 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to snapshot value.
         /// </returns>
         [HttpPost]
-        [Route("tags/snapshot")]
+        [Route("data/snapshot")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, TagValueDto>))]
         public async Task<IActionResult> GetSnapshotData([FromBody] SnapshotDataRequest request, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
@@ -220,7 +220,7 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to snapshot value.
         /// </returns>
         [HttpGet]
-        [Route("tags/snapshot")]
+        [Route("data/snapshot")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, TagValueDto>))]
         public Task<IActionResult> GetSnapshotData([FromQuery] string[] tag, CancellationToken cancellationToken) {
             var model = new SnapshotDataRequest() {
@@ -241,7 +241,7 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to historical tag values.
         /// </returns>
         [HttpPost]
-        [Route("tags/raw")]
+        [Route("data/raw")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
         public async Task<IActionResult> GetRawData([FromBody] RawDataRequest request, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
@@ -282,7 +282,7 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to historical tag values.
         /// </returns>
         [HttpGet]
-        [Route("tags/raw")]
+        [Route("data/raw")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
         public Task<IActionResult> GetRawData(CancellationToken cancellationToken, [FromQuery] string[] tag, [FromQuery] string start, [FromQuery] string end, [FromQuery] int pointCount = 0) {
             var model = new RawDataRequest() {
@@ -306,9 +306,9 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to historical tag values.
         /// </returns>
         [HttpPost]
-        [Route("tags/processed")]
+        [Route("data/processed")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
-        public async Task<IActionResult> GetProcessedData([FromBody] AggregatedDataRequest request, CancellationToken cancellationToken) {
+        public async Task<IActionResult> GetProcessedData([FromBody] ProcessedDataRequest request, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
@@ -351,10 +351,10 @@ namespace Aika.AspNetCore.Controllers {
         /// Successful responses contain a dictionary that maps from tag name to historical tag values.
         /// </returns>
         [HttpGet]
-        [Route("tags/processed")]
+        [Route("data/processed")]
         [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
         public Task<IActionResult> GetProcessedData(CancellationToken cancellationToken, [FromQuery] string[] tag, [FromQuery] string function, [FromQuery] string start, [FromQuery] string end, [FromQuery] string sampleInterval = null, [FromQuery] int? pointCount = null) {
-            var model = new AggregatedDataRequest() {
+            var model = new ProcessedDataRequest() {
                 Tags = tag,
                 Function = function,
                 Start = start,
@@ -365,6 +365,84 @@ namespace Aika.AspNetCore.Controllers {
 
             TryValidateModel(model);
             return GetProcessedData(model, cancellationToken);
+        }
+
+
+        /// <summary>
+        /// Writes data to the historian snapshot.
+        /// </summary>
+        /// <param name="request">The data to write.  Values will only be updated in the historian if they pass the destination tags' exception and compression filters.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// Successful responses contain a write summary for each tag in the request.
+        /// </returns>
+        [HttpPost]
+        [Route("data/write")]
+        [Authorize(Policy = Authorization.Policies.WriteTagData)]
+        [ProducesResponseType(200, Type = typeof(IDictionary<string, WriteTagValuesResultDto>))]
+        public async Task<IActionResult> WriteSnapshotData([FromBody] WriteTagValuesRequest request, CancellationToken cancellationToken) {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState); // 400
+            }
+
+            try {
+                var result = await _historian.WriteTagData(User, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
+                return Ok(result.ToDictionary(x => x.Key, x => x.Value.ToWriteTagValuesResultDto())); // 200
+            }
+            catch (ArgumentException) {
+                return BadRequest(); // 400
+            }
+            catch (OperationCanceledException) {
+                return StatusCode(204); // 204
+            }
+            catch (SecurityException) {
+                return Forbid(); // 403
+            }
+            catch (NotSupportedException) {
+                return BadRequest(); // 400
+            }
+            catch (NotImplementedException) {
+                return BadRequest(); // 400
+            }
+        }
+
+
+        /// <summary>
+        /// Writes data directly into the historian archive.
+        /// </summary>
+        /// <param name="request">The data to write.  Values are inserted directly into the archive, bypassing the exception and compression filters.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// Successful responses contain a write summary for each tag in the request.
+        /// </returns>
+        [HttpPost]
+        [Route("data/write/archive")]
+        [Authorize(Policy = Authorization.Policies.WriteTagData)]
+        [ProducesResponseType(200, Type = typeof(IDictionary<string, WriteTagValuesResultDto>))]
+        public async Task<IActionResult> WriteArchiveData([FromBody] WriteTagValuesRequest request, CancellationToken cancellationToken) {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState); // 400
+            }
+
+            try {
+                var result = await _historian.InsertTagData(User, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
+                return Ok(result.ToDictionary(x => x.Key, x => x.Value.ToWriteTagValuesResultDto())); // 200
+            }
+            catch (ArgumentException) {
+                return BadRequest(); // 400
+            }
+            catch (OperationCanceledException) {
+                return StatusCode(204); // 204
+            }
+            catch (SecurityException) {
+                return Forbid(); // 403
+            }
+            catch (NotSupportedException) {
+                return BadRequest(); // 400
+            }
+            catch (NotImplementedException) {
+                return BadRequest(); // 400
+            }
         }
 
     }

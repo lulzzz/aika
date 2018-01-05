@@ -103,10 +103,6 @@ namespace Aika.SampleApp {
             }
 
             app.UseAuthentication();
-            app.Use((context, next) => {
-                context.User = SampleDataGenerator.GetSystemIdentity();
-                return next();
-            });
 
             app.UseMvc();
             app.UseSignalR(x => x.MapAikaHubs()); // Make sure that the Aika hubs are mapped.

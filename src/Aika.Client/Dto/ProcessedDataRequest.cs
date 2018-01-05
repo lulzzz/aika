@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace Aika.Client.Dto {
     /// <summary>
-    /// Describes a historical data query.
+    /// Describes a historical data query for aggregated data.
     /// </summary>
-    public class AggregatedDataRequest : HistoricalDataRequest {
+    public class ProcessedDataRequest : HistoricalDataRequest {
 
         /// <summary>
         /// Gets or sets the aggregate function to use.
