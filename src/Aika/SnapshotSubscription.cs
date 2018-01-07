@@ -57,12 +57,27 @@ namespace Aika {
         /// <returns>
         /// A task that will add the tag subscriptions.
         /// </returns>
+        /// <exception cref="ObjectDisposedException">The object has been disposed.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="tagNames"/> does not contain any non-null-or-empty entries.</exception>
         public async Task AddTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
             if (_isDisposed) {
                 throw new ObjectDisposedException(GetType().FullName);
             }
 
-            var tags = await _historian.GetTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
+            if (identity == null) {
+                throw new ArgumentNullException(nameof(identity));
+            }
+
+            var distinctTagNames = tagNames?.Where(x => String.IsNullOrWhiteSpace(x))
+                                            .Select(x => x.Trim())
+                                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                                            .ToArray();
+            if (distinctTagNames?.Length == 0) {
+                throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagNames));
+            }
+
+            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
             foreach (var item in tags) {
                 if (!_subscribedTags.TryAdd(item.Id, item)) {
                     continue;
@@ -99,12 +114,27 @@ namespace Aika {
         /// <returns>
         /// A task that will remove the tag subscriptions.
         /// </returns>
+        /// <exception cref="ObjectDisposedException">The object has been disposed.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="tagNames"/> does not contain any non-null-or-empty entries.</exception>
         public async Task RemoveTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
             if (_isDisposed) {
                 throw new ObjectDisposedException(GetType().FullName);
             }
 
-            var tags = await _historian.GetTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
+            if (identity == null) {
+                throw new ArgumentNullException(nameof(identity));
+            }
+
+            var distinctTagNames = tagNames?.Where(x => String.IsNullOrWhiteSpace(x))
+                                            .Select(x => x.Trim())
+                                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                                            .ToArray();
+            if (distinctTagNames?.Length == 0) {
+                throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagNames));
+            }
+
+            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
             foreach (var item in tags) {
                 UnsubscribeTag(item);
             }

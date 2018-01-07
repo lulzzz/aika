@@ -239,7 +239,7 @@ namespace Aika.Historians {
 
 
         public override Task<TagDefinition> CreateTag(ClaimsPrincipal claimsIdentity, TagSettings tag, CancellationToken cancellationToken) {
-            var result = new InMemoryTagDefinition(this, TagDefinition.CreateTagId(), tag);
+            var result = new InMemoryTagDefinition(this, null, tag);
             _tags[result.Id] = result;
 
             return Task.FromResult<TagDefinition>(result);

@@ -65,6 +65,7 @@ namespace Aika
         ///   The initial exception value that the filter should use.  If <see langword="null"/>, the 
         ///   first value passed to the filter will always be considered to be exceptional.
         /// </param>
+        /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
         public ExceptionFilterState(TagValueFilterSettings settings, TagValue initialExceptionValue) {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             LastExceptionValue = initialExceptionValue;

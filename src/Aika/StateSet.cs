@@ -48,13 +48,21 @@ namespace Aika {
 
 
         /// <summary>
+        /// Gets the state values.
+        /// </summary>
+        internal IEnumerable<StateSetItem> States {
+            get { return _states.Values; }
+        }
+
+
+        /// <summary>
         /// Creates a new <see cref="StateSet"/> object.
         /// </summary>
         /// <param name="name">The state set name.</param>
         /// <exception cref="ArgumentException"><paramref name="name"/> is <see langword="null"/> or white space.</exception>
         public StateSet(string name) {
             if (String.IsNullOrWhiteSpace(name)) {
-                throw new ArgumentException("You must specify a state set name.", nameof(name));
+                throw new ArgumentException(Resources.Error_StateSetNameIsRequired, nameof(name));
             }
             Name = name.Trim();
         }

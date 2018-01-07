@@ -81,6 +81,7 @@ namespace Aika {
         }
 
 
+#pragma warning disable CS0419 // Ambiguous reference in cref attribute
         /// <summary>
         /// Tests if data for a tag can be aggregated or interpolated.
         /// </summary>
@@ -91,6 +92,7 @@ namespace Aika {
         /// overloads instead.
         /// </returns>
         private bool CanAggregate(TagDefinition tag) {
+#pragma warning restore CS0419 // Ambiguous reference in cref attribute
             return tag.DataType != TagDataType.State && tag.DataType != TagDataType.Text;
         }
 
@@ -118,10 +120,10 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(tag));
             }
             if (utcStartTime >= utcEndTime) {
-                throw new ArgumentException("Start date cannot be greater than end date.", nameof(utcStartTime));
+                throw new ArgumentException(Resources.Error_StartTimeCannotBeLaterThanEndTime, nameof(utcStartTime));
             }
             if (sampleInterval <= TimeSpan.Zero) {
-                throw new ArgumentException("Sample interval cannot be less than or equal to zero.", nameof(sampleInterval));
+                throw new ArgumentException(Resources.Error_SampleIntervalMustBeGreaterThanZero, nameof(sampleInterval));
             }
             if (rawData == null) {
                 throw new ArgumentNullException(nameof(rawData));
@@ -279,10 +281,14 @@ namespace Aika {
         /// <param name="utcStartTime">The UTC start time for the aggregated data set.</param>
         /// <param name="utcEndTime">The UTC end time for the aggregated data set.</param>
         /// <param name="sampleInterval">The sample interval to use for the aggregation..</param>
-        /// <param name="rawData">The raw samples to use in the aggregation.  Note that, for accurate calculation, <paramref name="rawData"/> should contain samples starting at <paramref name="utcStartTime"/> - <paramref name="sampleInterval"/></param>
+        /// <param name="rawData">The raw samples to use in the aggregation.</param>
         /// <returns>
         /// The average tag values.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="sampleInterval"/> is less than or equal to <see cref="TimeSpan.Zero"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Average(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
@@ -298,13 +304,17 @@ namespace Aika {
         /// <summary>
         /// Calculates average (mean) data using the specified raw data samples.
         /// </summary>
+        /// <param name="tag">The tag definition for the data being aggregated.</param>
         /// <param name="utcStartTime">The UTC start time for the aggregated data set.</param>
         /// <param name="utcEndTime">The UTC end time for the aggregated data set.</param>
         /// <param name="pointCount">The point count to use for the aggregation..</param>
-        /// <param name="rawData">The raw samples to use in the aggregation.  Note that, for accurate calculation, <paramref name="rawData"/> should contain samples starting at <paramref name="utcStartTime"/> - <paramref name="pointCount"/></param>
+        /// <param name="rawData">The raw samples to use in the aggregation.</param>
         /// <returns>
         /// The average tag values.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Average(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, int pointCount, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
@@ -348,10 +358,14 @@ namespace Aika {
         /// <param name="utcStartTime">The UTC start time for the aggregated data set.</param>
         /// <param name="utcEndTime">The UTC end time for the aggregated data set.</param>
         /// <param name="sampleInterval">The sample interval to use for the aggregation.</param>
-        /// <param name="rawData">The raw samples to use in the aggregation.  Note that, for accurate calculation, <paramref name="rawData"/> should contain samples starting at <paramref name="utcStartTime"/> - <paramref name="pointCount"/></param>
+        /// <param name="rawData">The raw samples to use in the aggregation.</param>
         /// <returns>
-        /// The average tag values.
+        /// The aggregated tag values.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="sampleInterval"/> is less than or equal to <see cref="TimeSpan.Zero"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Minimum(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
@@ -371,10 +385,13 @@ namespace Aika {
         /// <param name="utcStartTime">The UTC start time for the aggregated data set.</param>
         /// <param name="utcEndTime">The UTC end time for the aggregated data set.</param>
         /// <param name="pointCount">The point count to use for the aggregation.</param>
-        /// <param name="rawData">The raw samples to use in the aggregation.  Note that, for accurate calculation, <paramref name="rawData"/> should contain samples starting at <paramref name="utcStartTime"/> - <paramref name="pointCount"/></param>
+        /// <param name="rawData">The raw samples to use in the aggregation.</param>
         /// <returns>
-        /// The average tag values.
+        /// The aggregated tag values.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Minimum(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, int pointCount, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
@@ -418,10 +435,14 @@ namespace Aika {
         /// <param name="utcStartTime">The UTC start time for the aggregated data set.</param>
         /// <param name="utcEndTime">The UTC end time for the aggregated data set.</param>
         /// <param name="sampleInterval">The sample interval to use for the aggregation..</param>
-        /// <param name="rawData">The raw samples to use in the aggregation.  Note that, for accurate calculation, <paramref name="rawData"/> should contain samples starting at <paramref name="utcStartTime"/> - <paramref name="sampleInterval"/></param>
+        /// <param name="rawData">The raw samples to use in the aggregation.</param>
         /// <returns>
-        /// The average tag values.
+        /// The aggregated tag values.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="sampleInterval"/> is less than or equal to <see cref="TimeSpan.Zero"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Maximum(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
@@ -441,10 +462,13 @@ namespace Aika {
         /// <param name="utcStartTime">The UTC start time for the aggregated data set.</param>
         /// <param name="utcEndTime">The UTC end time for the aggregated data set.</param>
         /// <param name="pointCount">The point count to use for the aggregation.</param>
-        /// <param name="rawData">The raw samples to use in the aggregation.  Note that, for accurate calculation, <paramref name="rawData"/> should contain samples starting at <paramref name="utcStartTime"/> - <paramref name="sampleInterval"/></param>
+        /// <param name="rawData">The raw samples to use in the aggregation.</param>
         /// <returns>
-        /// The average tag values.
+        /// The aggregated tag values.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Maximum(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, int pointCount, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
@@ -497,7 +521,12 @@ namespace Aika {
         /// <param name="utcStartTime">The start time for the interpolated data set.</param>
         /// <param name="utcEndTime">The end time for the interpolated data set.</param>
         /// <param name="sampleInterval">The sample interval to use for interpolation.</param>
-        /// <param name="rawData">The raw data to use in the interpolation calculations.  You should include the raw sample before or at <paramref name="utcStartTime"/>, and the raw sample at or after <paramref name="utcEndTime"/> in this set, to ensure that samples at <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.</param>
+        /// <param name="rawData">
+        ///   The raw data to use in the interpolation calculations.  You should include the raw sample 
+        ///   before or at <paramref name="utcStartTime"/>, and the raw sample at or after 
+        ///   <paramref name="utcEndTime"/> in this set, to ensure that samples at 
+        ///   <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.
+        /// </param>
         /// <param name="interpolateFunction">The interpolation function to use.</param>
         /// <returns>
         /// A set of interpolated samples.
@@ -507,10 +536,10 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(tag));
             }
             if (utcStartTime >= utcEndTime) {
-                throw new ArgumentException("Start date cannot be greater than end date.", nameof(utcStartTime));
+                throw new ArgumentException(Resources.Error_StartTimeCannotBeLaterThanEndTime, nameof(utcStartTime));
             }
             if (sampleInterval <= TimeSpan.Zero) {
-                throw new ArgumentException("Sample interval must be a positive time span.", nameof(sampleInterval));
+                throw new ArgumentException(Resources.Error_SampleIntervalMustBeGreaterThanZero, nameof(sampleInterval));
             }
             if (rawData == null) {
                 throw new ArgumentNullException(nameof(rawData));
@@ -624,7 +653,12 @@ namespace Aika {
         /// <param name="utcStartTime">The start time for the interpolated data set.</param>
         /// <param name="utcEndTime">The end time for the interpolated data set.</param>
         /// <param name="pointCount">The point count to use for interpolation.</param>
-        /// <param name="rawData">The raw data to use in the interpolation calculations.  You should include the raw sample before or at <paramref name="utcStartTime"/>, and the raw sample at or after <paramref name="utcEndTime"/> in this set, to ensure that samples at <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.</param>
+        /// <param name="rawData">
+        ///   The raw data to use in the interpolation calculations.  You should include the raw sample 
+        ///   before or at <paramref name="utcStartTime"/>, and the raw sample at or after 
+        ///   <paramref name="utcEndTime"/> in this set, to ensure that samples at 
+        ///   <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.
+        /// </param>
         /// <param name="interpolateFunction">The interpolation function to use.</param>
         /// <returns>
         /// A set of interpolated samples.
@@ -641,10 +675,19 @@ namespace Aika {
         /// <param name="utcStartTime">The start time for the interpolated data set.</param>
         /// <param name="utcEndTime">The end time for the interpolated data set.</param>
         /// <param name="sampleInterval">The sample interval to use for interpolation.</param>
-        /// <param name="rawData">The raw data to use in the interpolation calculations.  You should include the raw sample before or at <paramref name="utcStartTime"/>, and the raw sample at or after <paramref name="utcEndTime"/> in this set, to ensure that samples at <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.</param>
+        /// <param name="rawData">
+        ///   The raw data to use in the interpolation calculations.  You should include the raw sample 
+        ///   before or at <paramref name="utcStartTime"/>, and the raw sample at or after 
+        ///   <paramref name="utcEndTime"/> in this set, to ensure that samples at 
+        ///   <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.
+        /// </param>
         /// <returns>
         /// A set of interpolated samples.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="sampleInterval"/> is less than or equal to <see cref="TimeSpan.Zero"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Interpolate(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
@@ -664,10 +707,18 @@ namespace Aika {
         /// <param name="utcStartTime">The start time for the interpolated data set.</param>
         /// <param name="utcEndTime">The end time for the interpolated data set.</param>
         /// <param name="pointCount">The point count to use for interpolation.</param>
-        /// <param name="rawData">The raw data to use in the interpolation calculations.  You should include the raw sample before or at <paramref name="utcStartTime"/>, and the raw sample at or after <paramref name="utcEndTime"/> in this set, to ensure that samples at <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.</param>
+        /// <param name="rawData">
+        ///   The raw data to use in the interpolation calculations.  You should include the raw sample 
+        ///   before or at <paramref name="utcStartTime"/>, and the raw sample at or after 
+        ///   <paramref name="utcEndTime"/> in this set, to ensure that samples at 
+        ///   <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.
+        /// </param>
         /// <returns>
         /// A set of interpolated samples.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Interpolate(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, int pointCount, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
@@ -685,13 +736,22 @@ namespace Aika {
         /// raw value before each sample time as the aggregated value.  Use this method when you need to 
         /// create "aggregated" data for tags that use discrete state values (e.g. open/closed, on/off).
         /// </summary>
+        /// <param name="tag">The tag definition for the raw data.</param>
         /// <param name="utcStartTime">The start time for the resulting data set.</param>
         /// <param name="utcEndTime">The end time for the resulting data set.</param>
         /// <param name="sampleInterval">The sample interval to use.</param>
-        /// <param name="rawData">The raw data to use in the interpolation calculations.  You should include the raw sample before or at <paramref name="utcStartTime"/> in this set, to ensure that samples at <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.</param>
+        /// <param name="rawData">
+        ///   The raw data to use in the interpolation calculations.  You should include the raw sample 
+        ///   before or at <paramref name="utcStartTime"/> in this set, to ensure that samples at 
+        ///   <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.
+        /// </param>
         /// <returns>
         /// A set of equally-spaced samples.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="sampleInterval"/> is less than or equal to <see cref="TimeSpan.Zero"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Interval(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, IEnumerable<TagValue> rawData) {
             return GetInterpolatedData(tag, utcStartTime, utcEndTime, sampleInterval, rawData, (t, sampleTime, val1, val2) => new TagValue(sampleTime, val1.NumericValue, val1.TextValue, val1.Quality, t.Units));
         }
@@ -702,14 +762,21 @@ namespace Aika {
         /// raw value before each sample time as the aggregated value.  Use this method when you need to 
         /// create "aggregated" data for tags that use discrete state values (e.g. open/closed, on/off).
         /// </summary>
-        /// <param name="tag">The tag definition for the data being aggregated.</param>
+        /// <param name="tag">The tag definition for the raw data.</param>
         /// <param name="utcStartTime">The start time for the resulting data set.</param>
         /// <param name="utcEndTime">The end time for the resulting data set.</param>
         /// <param name="pointCount">The point count to use.</param>
-        /// <param name="rawData">The raw data to use in the interpolation calculations.  You should include the raw sample before or at <paramref name="utcStartTime"/> in this set, to ensure that samples at <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.</param>
+        /// <param name="rawData">
+        ///   The raw data to use in the interpolation calculations.  You should include the raw sample 
+        ///   before or at <paramref name="utcStartTime"/> in this set, to ensure that samples at 
+        ///   <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/> can be calculated.
+        /// </param>
         /// <returns>
         /// A set of equally-spaced samples.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Interval(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, int pointCount, IEnumerable<TagValue> rawData) {
             return Interval(tag, utcStartTime, utcEndTime, GetSampleInterval(utcStartTime, utcEndTime, pointCount), rawData);
         }
@@ -729,6 +796,10 @@ namespace Aika {
         /// <returns>
         /// A set of triend-friendly samples.
         /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="sampleInterval"/> is less than or equal to <see cref="TimeSpan.Zero"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         /// <remarks>
         /// The plot function works by collecting raw values into buckets.  Each bucket has a start time and 
         /// end time, with the total time range being 4x <paramref name="sampleInterval"/>.  The function 
@@ -749,10 +820,10 @@ namespace Aika {
                 return Interval(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
             if (utcStartTime >= utcEndTime) {
-                throw new ArgumentException("Start date cannot be greater than end date.", nameof(utcStartTime));
+                throw new ArgumentException(Resources.Error_StartTimeCannotBeLaterThanEndTime, nameof(utcStartTime));
             }
             if (sampleInterval <= TimeSpan.Zero) {
-                throw new ArgumentException("Sample interval must be a positive time span.", nameof(sampleInterval));
+                throw new ArgumentException(Resources.Error_SampleIntervalMustBeGreaterThanZero, nameof(sampleInterval));
             }
             if (rawData == null) {
                 throw new ArgumentNullException(nameof(rawData));
@@ -866,7 +937,6 @@ namespace Aika {
                         }
                         else {
                             // We don't have any numeric values, so we have to add each value in the bucket.
-                            // TODO: should we be reducing the raw points here?
                             foreach (var item in bucket.Samples) {
                                 result.Add(item);
                             }
@@ -929,19 +999,26 @@ namespace Aika {
         /// <summary>
         /// Aggregates raw data.
         /// </summary>
-        /// <param name="tag"></param>
-        /// <param name="aggregateName"></param>
-        /// <param name="utcStartTime"></param>
-        /// <param name="utcEndTime"></param>
-        /// <param name="sampleInterval"></param>
-        /// <param name="rawData"></param>
-        /// <returns></returns>
+        /// <param name="tag">The tag definition for the data being aggregated.</param>
+        /// <param name="aggregateName">The data function to use.</param>
+        /// <param name="utcStartTime">The UTC start time for the aggregated data set.</param>
+        /// <param name="utcEndTime">The UTC end time for the aggregated data set.</param>
+        /// <param name="sampleInterval">The sample interval for the query.</param>
+        /// <param name="rawData">The raw data to aggregate.</param>
+        /// <returns>
+        /// The aggregated data set.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="aggregateName"/> is not a supported data function.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="sampleInterval"/> is less than or equal to <see cref="TimeSpan.Zero"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Aggregate(TagDefinition tag, string aggregateName, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
             }
             if (!IsSupportedFunction(aggregateName)) {
-                throw new ArgumentException("Unsupported function.", nameof(aggregateName));
+                throw new ArgumentException(Resources.Error_UnsupportedDataFunction, nameof(aggregateName));
             }
 
             // AVG
@@ -972,13 +1049,18 @@ namespace Aika {
         /// <summary>
         /// Aggregates raw data.
         /// </summary>
-        /// <param name="tag"></param>
-        /// <param name="aggregateName"></param>
-        /// <param name="utcStartTime"></param>
-        /// <param name="utcEndTime"></param>
-        /// <param name="pointCount"></param>
-        /// <param name="rawData"></param>
-        /// <returns></returns>
+        /// <param name="tag">The tag definition for the data being aggregated.</param>
+        /// <param name="aggregateName">The data function to use.</param>
+        /// <param name="utcStartTime">The UTC start time for the aggregated data set.</param>
+        /// <param name="utcEndTime">The UTC end time for the aggregated data set.</param>
+        /// <param name="pointCount">The point count to use.</param>
+        /// <param name="rawData">The raw data to aggregate.</param>
+        /// <returns>
+        /// The aggregated data set.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         public IEnumerable<TagValue> Aggregate(TagDefinition tag, string aggregateName, DateTime utcStartTime, DateTime utcEndTime, int pointCount, IEnumerable<TagValue> rawData) {
             return Aggregate(tag, aggregateName, utcStartTime, utcEndTime, GetSampleInterval(utcStartTime, utcEndTime, pointCount), rawData);
         }

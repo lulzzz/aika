@@ -3,21 +3,60 @@ using System.Collections.Generic;
 using System.Text;
 
 namespace Aika {
+    /// <summary>
+    /// Describes the detailed result of a compression filter data processing operation. 
+    /// </summary>
     public class CompressionFilterResultDetails {
 
+        /// <summary>
+        /// Gets a flag indicating if the incoming value was rejected or not.  Values that are not 
+        /// rejected result in a value being sent to the tag's data archive.
+        /// </summary>
         public bool Rejected { get; }
 
+        /// <summary>
+        /// Gets the reason that the incoming value was (or wasn't) rejected.
+        /// </summary>
         public string Reason { get; }
 
+        /// <summary>
+        /// Gets the last-archived value for the tag at the point that incoming value was received.
+        /// </summary>
         public TagValue LastArchivedValue { get; }
 
+        /// <summary>
+        /// Gets the last-received value for the tag at the point that the incoming value was received 
+        /// (i.e. the value that was received by the compression filter immediately before the incoming 
+        /// value).
+        /// </summary>
         public TagValue LastReceivedValue { get; }
 
+        /// <summary>
+        /// Gets the compression filter settings when the incoming value was received.
+        /// </summary>
         public TagValueFilterSettings Settings { get; }
 
+        /// <summary>
+        /// Gets the compression limit values that were applied to the incoming value.
+        /// </summary>
         public CompressionLimits Limits { get; }
 
 
+        /// <summary>
+        /// Creates a new <see cref="CompressionFilterResultDetails"/> object.
+        /// </summary>
+        /// <param name="rejected">Flags if the incoming value was rejected by the filter or not.</param>
+        /// <param name="reason">The reason that the incoming value was (or wasn't) rejected.</param>
+        /// <param name="lastAchivedValue">
+        ///   The last-archived value for the tag at the point that incoming value was received.
+        /// </param>
+        /// <param name="lastReceivedValue">
+        ///   The last-received value for the tag at the point that the incoming value was received 
+        ///   (i.e. the value that was received by the compression filter immediately before the 
+        ///   incoming value).
+        /// </param>
+        /// <param name="settings">The compression filter settings when the incoming value was received.</param>
+        /// <param name="limits">The compression limit values that were applied to the incoming value.</param>
         internal CompressionFilterResultDetails(bool rejected, string reason, TagValue lastAchivedValue, TagValue lastReceivedValue, TagValueFilterSettings settings, CompressionLimits limits) {
             Rejected = rejected;
             Reason = reason;
@@ -31,6 +70,9 @@ namespace Aika {
         }
 
 
+        /// <summary>
+        /// Describes the limits applied to an incoming tag value by a compression filter.
+        /// </summary>
         public class CompressionLimits {
 
             /// <summary>
@@ -44,7 +86,6 @@ namespace Aika {
             /// Gets the interpolated compression limits that were calculated for an incoming tag value.  
             /// The <see cref="Incoming"/> limits are interpolated using the last-archived tag value 
             /// and the <see cref="Base"/> limit set.
-            /// </summary>
             /// </summary>
             public CompressionLimitSet Incoming { get; }
 

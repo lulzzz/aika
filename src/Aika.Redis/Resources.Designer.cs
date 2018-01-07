@@ -63,27 +63,45 @@ namespace Aika.Redis {
         /// <summary>
         ///   Looks up a localized string similar to Redis-backed data historian..
         /// </summary>
-        internal static string RedisHistorian_Description {
+        internal static string Description {
             get {
-                return ResourceManager.GetString("RedisHistorian_Description", resourceCulture);
+                return ResourceManager.GetString("Description", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to The specified tag ID is invalid..
         /// </summary>
-        internal static string RedisHistorian_Error_InvalidTagId {
+        internal static string Error_InvalidTagId {
             get {
-                return ResourceManager.GetString("RedisHistorian_Error_InvalidTagId", resourceCulture);
+                return ResourceManager.GetString("Error_InvalidTagId", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to A state set with the same name already exists..
+        /// </summary>
+        internal static string Error_StateSetAlreadyExists {
+            get {
+                return ResourceManager.GetString("Error_StateSetAlreadyExists", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The specified state set does not exist..
+        /// </summary>
+        internal static string Error_StateSetDoesNotExist {
+            get {
+                return ResourceManager.GetString("Error_StateSetDoesNotExist", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Connected.
         /// </summary>
-        internal static string RedisHistorian_Properties_Connected {
+        internal static string Properties_Connected {
             get {
-                return ResourceManager.GetString("RedisHistorian_Properties_Connected", resourceCulture);
+                return ResourceManager.GetString("Properties_Connected", resourceCulture);
             }
         }
     }

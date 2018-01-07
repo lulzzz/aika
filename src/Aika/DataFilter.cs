@@ -23,23 +23,29 @@ namespace Aika {
     /// 
     /// <para>
     /// The exception filter is used to determine if an incoming value should replace the existing 
-    /// snapshot value for a tag.   To receive notifications when incoming values pass the exception 
-    /// filter test, subscribe to the <see cref="ExceptionFilterValueEmitted"/> event.
+    /// snapshot value for a tag.   To receive notifications when incoming values are processed by 
+    /// the exception filter, subscribe to the <see cref="ExceptionFilterState.ValueProcessed"/> 
+    /// event on the <see cref="ExceptionFilter"/> property.
     /// </para>
     /// 
     /// <para>
     /// The compression filter is used to determing when tag values should be written to a data archive 
     /// in order to maintain the correct shape for the snapshot values that have been received for a tag.  
-    /// To receive notifications when the buffer determines that values should be archived, subscribe to 
-    /// the <see cref="Archive"/> event.
+    /// To receive notifications when incoming values are processed by the compression filter, subscribe 
+    /// to the <see cref="CompressionFilterState.ValueProcessed"/> event on the 
+    /// <see cref="CompressionFilter"/> property.
+    /// </para>
+    /// 
+    /// <para>
+    /// To receive notifications when the compression filter determines that values should be archived, 
+    /// subscribe to the <see cref="Archive"/> event.
     /// </para>
     /// 
     /// <para>
     /// Filtering can be disabled entirely by setting the <see cref="IsEnabled"/> property on the 
     /// <see cref="DataFilter"/> to <see langword="false"/>.  Additionally, exception filtering 
-    /// and compression filtering can be individually disabled by setting the <see cref="DataFilterSettings.IsEnabled"/> 
-    /// property to <see langword="false"/> on the <see cref="ExceptionFilter"/> and <see cref="CompressionFilter"/> 
-    /// properties respectively.
+    /// and compression filtering can be individually disabled in the settings on the 
+    /// <see cref="ExceptionFilter"/> and <see cref="CompressionFilter"/> properties respectively.
     /// </para>
     /// 
     /// <para>
@@ -177,7 +183,6 @@ namespace Aika {
         /// Creates a new <see cref="DataFilter"/> object using the specified exception filter and compression filter settings.
         /// </summary>
         /// <param name="name">The name for the filter.</param>
-        /// <param name="snapshotValue">The initial snapshot value that the filter should use.</param>
         /// <param name="exceptionSettings">The exception filter settings.  If <see langword="null"/>, a default (disabled) exception filter will be assigned to the buffer.</param>
         /// <param name="compressionSettings">The compression filter settings.  If <see langword="null"/>, a default (disabled) compression filter will be assigned to the buffer.</param>
         /// <param name="loggerFactory">The <see cref="ILoggerFactory"/> to use for logging.</param>
@@ -261,12 +266,6 @@ namespace Aika {
         /// <exception cref="ObjectDisposedException">The <see cref="DataFilter"/> has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="incoming"/> is <see langword="null"/>.</exception>
         /// <remarks>
-        /// 
-        /// <para>
-        /// The <see cref="DataFilter"/> will perform exception filtering on 
-        /// the incoming value.  If the value passes the exception filter, the <see cref="ExceptionFilterValueEmitted"/> 
-        /// event will be raised, allowing subscribers to receive new snapshot values for the tag.
-        /// </para>
         /// 
         /// <para>
         /// Incoming values that pass the exception filter will then be passed to the compression filter.  

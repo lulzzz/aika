@@ -93,12 +93,13 @@ namespace Aika
         ///   are not set, the compression filter will require multiple incoming values to be passed to 
         ///   it before it starts applying the compression rules as expected.
         /// </param>
+        /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="lastArchivedValue"/> and <paramref name="lastReceivedValue"/> are both defined, and <paramref name="lastArchivedValue"/> has a sample time that is greater than <paramref name="lastReceivedValue"/>.</exception>
         public CompressionFilterState(TagValueFilterSettings settings, TagValue lastArchivedValue, TagValue lastReceivedValue) {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
             if (lastArchivedValue != null && lastReceivedValue != null && lastArchivedValue.UtcSampleTime > lastReceivedValue.UtcSampleTime) {
-                throw new ArgumentException("Last-archived value cannot be more recent than last-received value.", nameof(lastArchivedValue));
+                throw new ArgumentException(Resources.Error_CompressionFilter_LastArchivedValueCannotBeNewerThanLastReceivedValue, nameof(lastArchivedValue));
             }
 
             LastArchivedValue = lastArchivedValue;

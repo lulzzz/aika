@@ -144,7 +144,7 @@ namespace Aika.Redis {
         /// </returns>
         internal static async Task<RedisTagDefinition> Create(RedisHistorian historian, TagSettings settings, CancellationToken cancellationToken) {
             var now = DateTime.UtcNow;
-            var result = new RedisTagDefinition(historian, TagDefinition.CreateTagId(), settings, now, now, null, null);
+            var result = new RedisTagDefinition(historian, null, settings, now, now, null, null);
             var key = historian.GetKeyForTagIdsList();
             
             await Task.WhenAny(Task.WhenAll(result.Save(cancellationToken), historian.Connection.GetDatabase().ListRightPushAsync(key, result.Id)), Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
@@ -547,7 +547,7 @@ namespace Aika.Redis {
         /// </summary>
         /// <param name="utcStartTime">The UTC start time for the query.</param>
         /// <param name="utcEndTime">The UTC end time for the query.</param>
-        /// <param name="maxSampleCount">The maximum number of samples to return.</param>
+        /// <param name="sampleCount">The maximum number of samples to return.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A task that will return the raw tag values.

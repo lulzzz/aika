@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -106,13 +109,15 @@ namespace Aika {
         /// Creates a new <see cref="TagDefinition"/> object.
         /// </summary>
         /// <param name="historian">The <see cref="IHistorian"/> instance that the tag belongs to.</param>
-        /// <param name="id"></param>
-        /// <param name="settings"></param>
-        /// <param name="utcCreatedAt"></param>
-        /// <param name="utcLastModifiedAt"></param>
-        /// <param name="snapshotValue"></param>
-        /// <param name="lastArchivedValue"></param>
+        /// <param name="id">The tag ID.  If <see langword="null"/>, a new tag ID will ge generated automatically.</param>
+        /// <param name="settings">The tag settings.</param>
+        /// <param name="utcCreatedAt">The UTC creation time for the tag.</param>
+        /// <param name="utcLastModifiedAt">The UTC last-modified time for the tag.</param>
+        /// <param name="snapshotValue">The tag's current snapshot value.  Can be <see langword="null"/>.</param>
+        /// <param name="lastArchivedValue">The tag's last-archived value.  Can be <see langword="null"/>.</param>
         /// <exception cref="ArgumentNullException"><paramref name="historian"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ValidationException"><paramref name="settings"/> is not valid.</exception>
         protected TagDefinition(HistorianBase historian, string id, TagSettings settings, DateTime? utcCreatedAt, DateTime? utcLastModifiedAt, TagValue snapshotValue, TagValue lastArchivedValue) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _logger = _historian.LoggerFactory?.CreateLogger<TagDefinition>();
@@ -121,7 +126,7 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(settings));
             }
 
-            // TODO: validate settings
+            Validator.ValidateObject(settings, new ValidationContext(settings), true);
 
             Id = id ?? CreateTagId();
             Name = settings.Name;
@@ -143,7 +148,7 @@ namespace Aika {
 
                 _historian.TaskRunner.RunBackgroundTask(async ct => {
                     try {
-                        await InsertArchiveValues(values.ToArray(), ct).ConfigureAwait(false);
+                        await InsertArchiveValues(ClaimsPrincipal.Current, values.ToArray(), ct).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) {
                         // App is shutting down...
@@ -169,49 +174,115 @@ namespace Aika {
         }
 
 
+        private async Task<StateSet> GetStateSet(ClaimsPrincipal identity, CancellationToken cancellationToken) {
+            if (DataType != TagDataType.State) {
+                return null;
+            }
+
+            if (String.IsNullOrWhiteSpace(StateSet)) {
+                throw new InvalidOperationException(Resources.Error_StateSetNameIsRequired);
+            }
+
+            return await _historian.GetStateSet(identity, StateSet, cancellationToken).ConfigureAwait(false);
+        }
+
+
         /// <summary>
         /// Writes new snapshot values to the tag.
         /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
         /// <param name="values">
         ///   The values to write.  Values that are more recent than the current snapshot value of the 
         ///   tag will be passed into the tag's data filter to test if they should be forwarded to the 
         ///   historian archive.
         /// </param>
-        public WriteTagValuesResult WriteSnapshotValues(IEnumerable<TagValue> values) {
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will return the write result.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
+        public async Task<WriteTagValuesResult> WriteSnapshotValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
+            if (identity == null) {
+                throw new ArgumentNullException(nameof(identity));
+            }
+            var stateSet = await GetStateSet(identity, cancellationToken).ConfigureAwait(false);
+
             var currentSnapshot = SnapshotValue;
 
             DateTime? earliestSampleTime = null;
             DateTime? latestSampleTime = null;
 
             var sampleCount = 0;
+            var invalidSampleCount = 0;
+
             var valsToWrite = values == null
                 ? (IEnumerable<TagValue>) new TagValue[0]
-                : values.Where(x => x != null && (currentSnapshot == null || x.UtcSampleTime > currentSnapshot.UtcSampleTime)).OrderBy(x => x.UtcSampleTime);
+                : values.Where(x => x != null && (currentSnapshot == null || x.UtcSampleTime > currentSnapshot.UtcSampleTime))
+                        .OrderBy(x => x.UtcSampleTime);
 
             foreach (var val in valsToWrite) {
-                SnapshotValue = val;
+                TagValue valueThisIteration;
+                if (stateSet == null) {
+                    valueThisIteration = val;
+                }
+                else {
+                    TagValue ssVal;
+
+                    if (!TagValue.TryCreateFromStateSet(stateSet, val, out ssVal)) {
+                        ++invalidSampleCount;
+                        continue;
+                    }
+
+                    valueThisIteration = ssVal;
+                }
+
+                SnapshotValue = valueThisIteration;
                 ++sampleCount;
                 if (!earliestSampleTime.HasValue) {
-                    earliestSampleTime = val.UtcSampleTime;
+                    earliestSampleTime = valueThisIteration.UtcSampleTime;
                 }
-                if (!latestSampleTime.HasValue || val.UtcSampleTime > latestSampleTime.Value) {
-                    latestSampleTime = val.UtcSampleTime;
+                if (!latestSampleTime.HasValue || valueThisIteration.UtcSampleTime > latestSampleTime.Value) {
+                    latestSampleTime = valueThisIteration.UtcSampleTime;
                 }
             }
 
             return sampleCount == 0
-                ? new WriteTagValuesResult(false, 0, null, null, new[] { "No values specified." })
-                : new WriteTagValuesResult(true, sampleCount, earliestSampleTime, latestSampleTime, null);
+                ? invalidSampleCount > 0 
+                    ? new WriteTagValuesResult(false, 0, null, null, new[] { String.Format(CultureInfo.CurrentCulture, Resources.WriteTagValuesResult_InvalidValuesSpecified, invalidSampleCount) })
+                    : new WriteTagValuesResult(false, 0, null, null, new[] { Resources.WriteTagValuesResult_NoValuesSpecified })
+                : new WriteTagValuesResult(true, sampleCount, earliestSampleTime, latestSampleTime, invalidSampleCount == 0 ? null : new[] { String.Format(CultureInfo.CurrentCulture, Resources.WriteTagValuesResult_InvalidValuesSpecified, invalidSampleCount) });
         }
 
 
         /// <summary>
         /// Inserts values into the historian archive.
         /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
         /// <param name="values">The values to insert.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns></returns>
-        public async Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, CancellationToken cancellationToken) {
+        /// <returns>
+        /// A task that will return the write result.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
+        public async Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
+            if (identity == null) {
+                throw new ArgumentNullException(nameof(identity));
+            }
+            var stateSet = await GetStateSet(identity, cancellationToken).ConfigureAwait(false);
+
+            if (stateSet != null) {
+                var vals = new List<TagValue>();
+                foreach (var value in values) {
+                    if (!TagValue.TryCreateFromStateSet(stateSet, value, out var val)) {
+                        continue;
+                    }
+
+                    vals.Add(val);
+                }
+
+                values = vals.ToArray();
+            }
+
             try {
                 return await OnInsertArchiveValues(values, cancellationToken).ConfigureAwait(false);
             }
@@ -236,7 +307,7 @@ namespace Aika {
         /// Creates a new tag identifier.
         /// </summary>
         /// <returns>A unique identifier for a tag.</returns>
-        public static string CreateTagId() {
+        private static string CreateTagId() {
             return Guid.NewGuid().ToString();
         }
 

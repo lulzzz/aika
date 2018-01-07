@@ -455,7 +455,7 @@ namespace Aika.AspNetCore.Controllers {
             }
 
             try {
-                var result = await _historian.InsertTagData(User, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.InsertTagArchiveData(User, request.ToTagValueDictionary(), cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToDictionary(x => x.Key, x => x.Value.ToWriteTagValuesResultDto())); // 200
             }
             catch (ArgumentException) {
