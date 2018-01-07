@@ -11,7 +11,7 @@ namespace Aika {
     public interface ITaskRunner {
 
         /// <summary>
-        /// When implemented in a derived type, registers a task to run in the background.
+        /// Registers a task to run in the background.
         /// </summary>
         /// <param name="action">The delegate to run in the background.</param>
         /// <param name="cancellationTokens">Additional cancellation tokens to observe while running the task.</param>

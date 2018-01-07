@@ -12,11 +12,11 @@ using Microsoft.AspNetCore.Mvc;
 namespace Aika.AspNetCore.Controllers.Configuration {
 
     /// <summary>
-    /// API controller for managing the state sets available to historian tags.
+    /// API controller for managing historian tags.
     /// </summary>
-    [Route("aika/api/configuration/[controller]")]
+    [Route("aika/api/configuration/tags")]
     [Authorize(Policy = Authorization.Policies.ManageTags)]
-    public class StateSetsController : Controller {
+    public class TagConfigurationController : Controller {
 
         /// <summary>
         /// Aika historian instance.
@@ -25,29 +25,70 @@ namespace Aika.AspNetCore.Controllers.Configuration {
 
 
         /// <summary>
-        /// Creates a new <see cref="StateSetsController"/> object.
+        /// Creates a new <see cref="TagConfigurationController"/> object.
         /// </summary>
         /// <param name="historian">The Aika historian instance.</param>
         /// <exception cref="ArgumentNullException"><paramref name="historian"/> is <see langword="null"/>.</exception>
-        public StateSetsController(AikaHistorian historian) {
+        public TagConfigurationController(AikaHistorian historian) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
         }
 
 
         /// <summary>
-        /// Gets the available state set definitions (i.e. the sets of named states that discrete, state-based tags can use).
+        /// Gets the number of configured tags.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// The content of a successful response will be the defined state sets, indexed by set name.
+        /// Successful responses contain the number of configured tags.  The response content will be 
+        /// <see langword="null"/> if the underlying historian chooses to not make this information 
+        /// available.
         /// </returns>
         [HttpGet]
-        [Route("")]
-        [ProducesResponseType(200, Type = typeof(IDictionary<string, StateSetDto>))]
-        public async Task<IActionResult> GetStateSets(CancellationToken cancellationToken) {
+        [Route("count")]
+        [ProducesResponseType(200, Type = typeof(int?))]
+        public async Task<IActionResult> GetTagCount(CancellationToken cancellationToken) {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState); // 400
+            }
+
             try {
-                var result = await _historian.GetStateSets(User, cancellationToken).ConfigureAwait(false);
-                return Ok(result.Values.OrderBy(x => x.Name).ToDictionary(x => x.Name, x => x.ToStateSetDto())); // 200
+                var result = await _historian.GetTagCount(User, cancellationToken).ConfigureAwait(false);
+                return Ok(result); // 200
+            }
+            catch (OperationCanceledException) {
+                return StatusCode(204); // 204
+            }
+            catch (SecurityException) {
+                return Forbid(); // 403
+            }
+            catch (NotSupportedException) {
+                return BadRequest(); // 400
+            }
+            catch (NotImplementedException) {
+                return BadRequest(); // 400
+            }
+        }
+
+
+        /// <summary>
+        /// Performs a tag search.
+        /// </summary>
+        /// <param name="request">The tag search request.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// Successful responses contain a page of matching search results.
+        /// </returns>
+        [HttpPost]
+        [Route("search")]
+        [ProducesResponseType(200, Type = typeof(IEnumerable<TagDefinitionExtendedDto>))]
+        public async Task<IActionResult> GetTags([FromBody] TagSearchRequest request, CancellationToken cancellationToken) {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState); // 400
+            }
+
+            try {
+                var result = await _historian.GetTags(User, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
+                return Ok(result.Select(x => x.ToTagDefinitionExtendedDto()).ToArray()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -68,23 +109,28 @@ namespace Aika.AspNetCore.Controllers.Configuration {
 
 
         /// <summary>
-        /// Gets the specified state set definition.
+        /// Gets the extended tag definition for the specified ID.
         /// </summary>
-        /// <param name="name">The name of the state set.</param>
+        /// <param name="id">The tag ID.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// The content of a successful response will be the requested state set definition.
+        /// Successful responses contain the extended definition for the tag.
         /// </returns>
         [HttpGet]
-        [Route("{name}", Name = "GetStateSetByName")]
-        [ProducesResponseType(200, Type = typeof(StateSetDto))]
-        public async Task<IActionResult> GetStateSet([FromRoute] string name, CancellationToken cancellationToken) {
+        [Route("{id}", Name = "GetTagById")]
+        [ProducesResponseType(200, Type = typeof(TagDefinitionExtendedDto))]
+        public async Task<IActionResult> GetTag([FromRoute] string id, CancellationToken cancellationToken) {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState); // 400
+            }
+
             try {
-                var result = await _historian.GetStateSet(User, name, cancellationToken).ConfigureAwait(false);
-                if (result == null) {
-                    return NotFound(); // 404
+                var result = await _historian.GetTags(User, new[] { id }, cancellationToken).ConfigureAwait(false);
+                var tag = result.FirstOrDefault(x => x.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+                if (tag == null) {
+                    return NotFound(id);
                 }
-                return Ok(result.ToStateSetDto()); // 200
+                return Ok(tag.ToTagDefinitionExtendedDto()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -105,24 +151,24 @@ namespace Aika.AspNetCore.Controllers.Configuration {
 
 
         /// <summary>
-        /// Creates a state set for use with state-based tags.
+        /// Creates a new tag.
         /// </summary>
-        /// <param name="stateSet">The state set definition.</param>
+        /// <param name="tag">The tag definition.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// The content of a successful response is the newly-created state set.
+        /// Successful responses contain the new tag definition.
         /// </returns>
         [HttpPost]
         [Route("")]
-        [ProducesResponseType(201, Type = typeof(StateSetDto))]
-        public async Task<IActionResult> CreateStateSet([FromBody] StateSetDto stateSet, CancellationToken cancellationToken) {
+        [ProducesResponseType(201, Type = typeof(TagDefinitionExtendedDto))]
+        public async Task<IActionResult> CreateTag([FromBody] TagSettings tag, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
 
             try {
-                var result = await _historian.CreateStateSet(User, stateSet.Name, stateSet.States.Where(x => x != null).Select(x => x.ToStateSetItem()).ToArray(), cancellationToken).ConfigureAwait(false);
-                return CreatedAtRoute("GetStateSetByName", new { name = result.Name }, result); // 201
+                var result = await _historian.CreateTag(User, tag, cancellationToken).ConfigureAwait(false);
+                return CreatedAtRoute("GetTagById", new { id = result.Id }, result.ToTagDefinitionExtendedDto()); // 201
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -143,24 +189,25 @@ namespace Aika.AspNetCore.Controllers.Configuration {
 
 
         /// <summary>
-        /// Updates an existing state set.
+        /// Updates an existing tag.
         /// </summary>
-        /// <param name="stateSet">The updated state set definition.</param>
+        /// <param name="id">The ID of the tag to update.</param>
+        /// <param name="tag">The updated tag definition.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// The content of a successful response will be the updated state set definition.
+        /// Successful responses contain the updated tag definition.
         /// </returns>
         [HttpPut]
-        [Route("")]
-        [ProducesResponseType(200, Type = typeof(StateSetDto))]
-        public async Task<IActionResult> UpdateStateSet([FromBody] StateSetDto stateSet, CancellationToken cancellationToken) {
+        [Route("{id}")]
+        [ProducesResponseType(200, Type = typeof(TagDefinitionExtendedDto))]
+        public async Task<IActionResult> UpdateTag([FromRoute] string id, [FromBody] TagSettings tag, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
-            
+
             try {
-                var result = await _historian.UpdateStateSet(User, stateSet.Name, stateSet.States?.Where(x => x != null).Select(x => x.ToStateSetItem()).ToArray(), cancellationToken).ConfigureAwait(false);
-                return Ok(result); // 200
+                var result = await _historian.UpdateTag(User, id, tag, cancellationToken).ConfigureAwait(false);
+                return Ok(result.ToTagDefinitionExtendedDto()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400
@@ -178,26 +225,26 @@ namespace Aika.AspNetCore.Controllers.Configuration {
                 return BadRequest(); // 400
             }
         }
-
+        
 
         /// <summary>
-        /// Deletes a state set.
+        /// Deletes a tag.
         /// </summary>
-        /// <param name="name">The name of the state set to delete.</param>
+        /// <param name="id">The ID of the tag to delete.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// The content of a successful response will be a flag indicating if the delete was successful.
+        /// 
         /// </returns>
         [HttpDelete]
-        [Route("{name}")]
+        [Route("{id}")]
         [ProducesResponseType(200, Type = typeof(bool))]
-        public async Task<IActionResult> DeleteStateSet([FromRoute] string name, CancellationToken cancellationToken) {
+        public async Task<IActionResult> DeleteTag([FromRoute] string id, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
-            
+
             try {
-                var result = await _historian.DeleteStateSet(User, name, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.DeleteTag(User, id, cancellationToken).ConfigureAwait(false);
                 return Ok(result); // 200
             }
             catch (ArgumentException) {
@@ -218,4 +265,5 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         }
 
     }
+
 }

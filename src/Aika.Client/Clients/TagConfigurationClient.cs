@@ -162,17 +162,21 @@ namespace Aika.Client.Clients {
         /// possible values for the tag.  Authorized using the <c>aika:managetags</c> authorization 
         /// policy.
         /// </summary>
+        /// <param name="filter">The state set search filter.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// A task that will return all of the defined state sets, indexed by name.
+        /// A task that will return the matching state sets.
         /// </returns>
-        public async Task<IDictionary<string, StateSetDto>> GetStateSets(CancellationToken cancellationToken) {
+        public async Task<IEnumerable<StateSetDto>> GetStateSets(StateSetSearchRequest filter, CancellationToken cancellationToken) {
+            if (filter == null) {
+                throw new ArgumentNullException(nameof(filter));
+            }
+
             const string url = "api/configuration/statesets";
-            var response = await _client.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            var response = await _client.PostAsJsonAsync(url, filter, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
-            return await response.Content.ReadAsJsonAsync<IDictionary<string, StateSetDto>>(cancellationToken).ConfigureAwait(false);
-
+            return await response.Content.ReadAsJsonAsync<IEnumerable<StateSetDto>>(cancellationToken).ConfigureAwait(false);
         }
 
 

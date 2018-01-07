@@ -12,7 +12,7 @@ namespace Aika.AspNetCore.Controllers {
     /// <summary>
     /// API controller that provides runtime information about the Aika historian.
     /// </summary>
-    [Route("aika/api/[controller]")]
+    [Route("aika/api/info")]
     [Authorize]
     public class InfoController : Controller {
 

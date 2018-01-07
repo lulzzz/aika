@@ -9,9 +9,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Aika.SampleApp {
     /// <summary>
-    /// Background service that configures two historian tags (named <c>Sinusoid</c> and 
-    /// <c>Sinusoid_Unfiltered</c> respectively) and populates the tags with sinusoid wave data 
-    /// starting from one day prior to 
+    /// Background service that configures a sinusoid wave historian tag (named <c>Sinusoid</c>) 
+    /// and populates the tags with sinusoid wave data starting from one day prior to 
     /// startup time.
     /// </summary>
     /// <remarks>
@@ -22,8 +21,8 @@ namespace Aika.SampleApp {
     /// </para>
     /// 
     /// <para>
-    /// Both tags contain data for a sinusoid wave with a 12 hour period and an amplitude of 50 (i.e. 
-    /// values range from -50 to 50).  A new sample is generated for both tags every 30 seconds.
+    /// The tag contains data for a sinusoid wave with a 12 hour period and an amplitude of 50 (i.e. 
+    /// values range from -50 to 50).  A new sample is generated every 30 seconds.
     /// </para>
     /// 
     /// <para>
@@ -41,12 +40,6 @@ namespace Aika.SampleApp {
     /// for the tag, are used to create an angle; incoming values are rejected if they fall inside 
     /// this angle.  Every incoming value causes the compression angle to narrow, increasing the 
     /// chance of the next incoming value passing through the compression filter.
-    /// </para>
-    /// 
-    /// <para>
-    /// The <c>Sinsuoid_Unfiltered</c> tag is primed with exactly the same set of values as the 
-    /// <c>Sinusoid</c> tag, but does not use exception or compression filtering, meaning that 
-    /// every incoming value will be written to the historian archive.
     /// </para>
     /// 
     /// </remarks>
@@ -83,9 +76,9 @@ namespace Aika.SampleApp {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _taskRunner = taskRunner ?? throw new ArgumentNullException(nameof(taskRunner));
 
-            if (_historian.Historian.GetType() != typeof(Aika.Historians.InMemoryHistorian)) {
-                throw new ArgumentException($"{nameof(SampleDataGenerator)} can only be used with the historian {typeof(Aika.Historians.InMemoryHistorian).FullName} implementation.", nameof(historian));
-            }
+            //if (_historian.Historian.GetType() != typeof(Aika.Historians.InMemoryHistorian)) {
+            //    throw new ArgumentException($"{nameof(SampleDataGenerator)} can only be used with the historian {typeof(Aika.Historians.InMemoryHistorian).FullName} implementation.", nameof(historian));
+            //}
         }
 
 
@@ -109,15 +102,27 @@ namespace Aika.SampleApp {
 
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken) {
-
+            while (!_historian.Historian.IsInitialized) {
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
 
             var identity = GetSystemIdentity();
+            var start = DateTime.UtcNow.AddDays(-1);
 
-            var now = DateTime.UtcNow;
-            var start = now.AddDays(-1);
+            var tags = await _historian.GetTags(identity, new[] { "Sinusoid" }, cancellationToken).ConfigureAwait(false);
+            var tag = tags.FirstOrDefault();
 
-            var tag = await _historian.CreateTag(identity,
-                                                new TagDefinitionUpdate() {
+            var wavePeriod = TimeSpan.FromHours(12).Ticks;
+            const int waveAmplitude = 50;
+
+            double waveFunc(double time, double period, double amplitude) {
+                return amplitude * (Math.Sin(2 * Math.PI * (1 / period) * (time % period)));
+            };
+
+            if (tag == null) {
+                tag = await _historian.CreateTag(identity,
+                                                new TagSettings() {
                                                     Name = "Sinusoid",
                                                     Description = $"12 hour sinusoid wave (starting at {start:dd-MMM-yy HH:mm:ss} UTC), with exception and compression filtering",
                                                     DataType = TagDataType.FloatingPoint,
@@ -135,43 +140,40 @@ namespace Aika.SampleApp {
                                                     }
                                                 },
                                                 cancellationToken).ConfigureAwait(false);
-
-            var tag_unfiltered = await _historian.CreateTag(identity,
-                                                new TagDefinitionUpdate() {
-                                                    Name = "Sinusoid_Unfiltered",
-                                                    Description = $"12 hour sinusoid wave (starting at {start:dd-MMM-yy HH:mm:ss} UTC), without exception and compression filtering",
-                                                    DataType = TagDataType.FloatingPoint,
-                                                    ExceptionFilterSettings = new TagValueFilterSettingsUpdate() {
-                                                        IsEnabled = false
-                                                    },
-                                                    CompressionFilterSettings = new TagValueFilterSettingsUpdate() {
-                                                        IsEnabled = false
-                                                    }
-                                                },
-                                                cancellationToken).ConfigureAwait(false);
-
-            var samples = new List<TagValue>();
-            var wavePeriod = TimeSpan.FromHours(12).Ticks;
-            const int waveAmplitude = 50;
-
-            double waveFunc(double time, double period, double amplitude) {
-                return amplitude * (Math.Sin(2 * Math.PI * (1 / period) * (time % period)));
-            };
-
-            for (var sampleTime = start; sampleTime <= now; sampleTime = sampleTime.Add(TimeSpan.FromMinutes(0.5))) {
-                var value = waveFunc(sampleTime.Ticks, wavePeriod, waveAmplitude);
-                samples.Add(new TagValue(sampleTime, value, null, TagValueQuality.Good, null));
+            }
+            else if (tag.SnapshotValue != null) {
+                start = tag.SnapshotValue.UtcSampleTime.Add(TimeSpan.FromMinutes(0.5));
             }
 
-            await _historian.WriteTagData(identity,
-                                         new Dictionary<string, IEnumerable<TagValue>>() {
-                                                 { tag.Name, samples },
-                                                 { tag_unfiltered.Name, samples }
-                                         },
-                                         cancellationToken).ConfigureAwait(false);
+            if (start <= DateTime.UtcNow) {
+                var samples = new List<TagValue>();
+
+                for (var sampleTime = start; sampleTime <= DateTime.UtcNow; sampleTime = sampleTime.Add(TimeSpan.FromMinutes(0.5))) {
+                    var value = waveFunc(sampleTime.Ticks, wavePeriod, waveAmplitude);
+                    samples.Add(new TagValue(sampleTime, value, null, TagValueQuality.Good, null));
+
+                    if (samples.Count >= 5000) {
+                        await _historian.WriteTagData(identity,
+                                            new Dictionary<string, IEnumerable<TagValue>>() {
+                                                 { tag.Name, samples.ToArray() }
+                                            },
+                                            cancellationToken).ConfigureAwait(false);
+
+                        samples.Clear();
+                    }
+                }
+
+                if (samples.Count > 0) {
+                    await _historian.WriteTagData(identity,
+                                                 new Dictionary<string, IEnumerable<TagValue>>() {
+                                                 { tag.Name, samples }
+                                                 },
+                                                 cancellationToken).ConfigureAwait(false);
+                }
+            }
 
             do {
-                // Every 30 seconds, we'll generate a new sample to write to both tags.
+                // Every 30 seconds, we'll generate a new sample to write to the tag.
                 await Task.Delay(TimeSpan.FromMinutes(0.5), cancellationToken).ConfigureAwait(false);
                 if (cancellationToken.IsCancellationRequested) {
                     break;
@@ -187,7 +189,6 @@ namespace Aika.SampleApp {
                     _historian.WriteTagData(identity,
                                             new Dictionary<string, IEnumerable<TagValue>>() {
                                                 { tag.Name, new[] { snapshot } },
-                                                { tag_unfiltered.Name, new[] { snapshot } }
                                             },
                                             ct));
             }

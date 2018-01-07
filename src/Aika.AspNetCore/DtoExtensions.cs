@@ -53,6 +53,19 @@ namespace Aika.AspNetCore {
         }
 
 
+        internal static StateSetFilter ToStateSetFilter(this StateSetSearchRequest filter) {
+            if (filter == null) {
+                throw new ArgumentNullException(nameof(filter));
+            }
+
+            return new StateSetFilter() {
+                PageSize = filter.PageSize,
+                Page = filter.Page,
+                Filter = filter.Name
+            };
+        }
+
+
         /// <summary>
         /// Creates a new <see cref="StateSetDto"/> from an existing <see cref="StateSet"/> object.
         /// </summary>
@@ -150,18 +163,18 @@ namespace Aika.AspNetCore {
 
 
         /// <summary>
-        /// Converts the object into a <see cref="TagDefinitionUpdate"/> object.
+        /// Converts the object into a <see cref="TagSettings"/> object.
         /// </summary>
         /// <returns>
-        /// An equivalent <see cref="TagDefinitionUpdate"/> object.
+        /// An equivalent <see cref="TagSettings"/> object.
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="item"/> is <see langword="null"/>.</exception>
-        internal static TagDefinitionUpdate ToTagDefinitionUpdate(this TagDefinitionUpdateDto item) {
+        internal static TagSettings ToTagDefinitionUpdate(this TagDefinitionUpdateDto item) {
             if (item == null) {
                 throw new ArgumentNullException(nameof(item));
             }
 
-            return new TagDefinitionUpdate() {
+            return new TagSettings() {
                 Name = item.Name,
                 Description = item.Description,
                 Units = item.Units,

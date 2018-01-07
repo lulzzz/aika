@@ -13,7 +13,7 @@ namespace Aika {
     public interface ITagDataWriter {
 
         /// <summary>
-        /// When implemented in a derived type, tests if the calling identity is allowed to write data to the specified tag names.
+        /// Tests if the calling identity is allowed to write data to the specified tag names.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagNames">The tag names.</param>

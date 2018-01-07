@@ -13,7 +13,7 @@ namespace Aika {
     public interface ITagDataReader {
 
         /// <summary>
-        /// When implemented in a derived type, tests if the calling identity is allowed to read data from the specified tag names.
+        /// Tests if the calling identity is allowed to read data from the specified tag names.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagNames">The tag names.</param>
@@ -25,20 +25,17 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, gets the data query functions supported by the historian.
+        /// Gets the data query functions supported by the historian.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A collection of data query functions.  Common functions are defined in the <see cref="DataQueryFunction"/> class.
         /// </returns>
-        /// <remarks>
-        /// If the <see cref="ITagDataReader"/> used by an <see cref="AikaHistorian"/> returns <see langword="false"/> for a given function name, 
-        /// </remarks>
         Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken);
 
 
         /// <summary>
-        /// When implemented in a derived type, retrieves snapshot data from the historian.
+        /// Retrieves snapshot data from the historian.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagNames">The names of the tags to query.</param>
@@ -50,7 +47,7 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, reads raw, unprocessed tag data.
+        /// Reads raw, unprocessed tag data.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagNames">The names of the tags to query.</param>
@@ -70,7 +67,7 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, performs an aggregated data query on the historian.
+        /// Performs an aggregated data query on the historian.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagNames">The names of the tags to query.</param>
@@ -87,7 +84,7 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, performs an aggregated data query on the historian.
+        /// Performs an aggregated data query on the historian.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagNames">The names of the tags to query.</param>

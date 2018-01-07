@@ -20,12 +20,7 @@ namespace Aika {
         /// <summary>
         /// The owning historian.
         /// </summary>
-        private readonly IHistorian _historian;
-
-        /// <summary>
-        /// The task runner the run background tasks with.
-        /// </summary>
-        private readonly ITaskRunner _taskRunner;
+        private readonly HistorianBase _historian;
 
         /// <summary>
         /// Gets the unique identifier for the tag.
@@ -111,46 +106,42 @@ namespace Aika {
         /// Creates a new <see cref="TagDefinition"/> object.
         /// </summary>
         /// <param name="historian">The <see cref="IHistorian"/> instance that the tag belongs to.</param>
-        /// <param name="taskRunner">The <see cref="ITaskRunner"/> instance to run background tasks with.</param>
         /// <param name="id"></param>
-        /// <param name="name"></param>
-        /// <param name="description"></param>
-        /// <param name="units"></param>
-        /// <param name="dataType"></param>
-        /// <param name="stateSet"></param>
-        /// <param name="exceptionFilterSettings"></param>
-        /// <param name="compressionFilterSettings"></param>
+        /// <param name="settings"></param>
         /// <param name="utcCreatedAt"></param>
         /// <param name="utcLastModifiedAt"></param>
         /// <param name="snapshotValue"></param>
         /// <param name="lastArchivedValue"></param>
-        /// <param name="loggerFactory"></param>
         /// <exception cref="ArgumentNullException"><paramref name="historian"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentNullException"><paramref name="taskRunner"/> is <see langword="null"/>.</exception>
-        protected TagDefinition(IHistorian historian, ITaskRunner taskRunner, string id, string name, string description, string units, TagDataType dataType, string stateSet, TagValueFilterSettings exceptionFilterSettings, TagValueFilterSettings compressionFilterSettings, DateTime? utcCreatedAt, DateTime? utcLastModifiedAt, TagValue snapshotValue, TagValue lastArchivedValue, ILoggerFactory loggerFactory) {
-            _logger = loggerFactory?.CreateLogger<TagDefinition>();
+        protected TagDefinition(HistorianBase historian, string id, TagSettings settings, DateTime? utcCreatedAt, DateTime? utcLastModifiedAt, TagValue snapshotValue, TagValue lastArchivedValue) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
-            _taskRunner = taskRunner ?? throw new ArgumentNullException(nameof(taskRunner));
+            _logger = _historian.LoggerFactory?.CreateLogger<TagDefinition>();
+
+            if (settings == null) {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            // TODO: validate settings
 
             Id = id ?? CreateTagId();
-            Name = name ?? throw new ArgumentNullException(nameof(name));
-            Description = description;
-            Units = units;
-            DataType = dataType;
-            StateSet = stateSet;
-            exceptionFilterSettings = exceptionFilterSettings ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
-            compressionFilterSettings = compressionFilterSettings ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
+            Name = settings.Name;
+            Description = settings.Description;
+            Units = settings.Units;
+            DataType = settings.DataType;
+            StateSet = settings.StateSet;
+            var exceptionFilterSettings = settings.ExceptionFilterSettings?.ToTagValueFilterSettings() ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
+            var compressionFilterSettings = settings.CompressionFilterSettings?.ToTagValueFilterSettings() ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
             UtcCreatedAt = utcCreatedAt ?? DateTime.UtcNow;
             UtcLastModifiedAt = utcLastModifiedAt ?? UtcCreatedAt;
 
             SnapshotValue = snapshotValue;
-            DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, SnapshotValue), new CompressionFilterState(compressionFilterSettings, lastArchivedValue, null), loggerFactory);
+            DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, SnapshotValue), new CompressionFilterState(compressionFilterSettings, lastArchivedValue, null), _historian.LoggerFactory);
             DataFilter.Archive += values => {
                 if (_logger.IsEnabled(LogLevel.Trace)) {
                     _logger.LogTrace($"[{Name}] Archiving {values.Count()} values emitted by the compression filter.");
                 }
 
-                _taskRunner.RunBackgroundTask(async ct => {
+                _historian.TaskRunner.RunBackgroundTask(async ct => {
                     try {
                         await InsertArchiveValues(values.ToArray(), ct).ConfigureAwait(false);
                     }
@@ -176,17 +167,6 @@ namespace Aika {
         public virtual IDictionary<string, object> GetProperties() {
             return new Dictionary<string, object>();
         }
-
-
-        /// <summary>
-        /// When implemented in a dervived class, gets the last-archived value for the tag.
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// A task that will return either the last-archived value for the tag, or <see langword="null"/> 
-        /// if the last-archived value is unavailable or undefined.
-        /// </returns>
-        public abstract Task<TagValue> GetLastArchivedValue(CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -226,7 +206,7 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived class, inserts values into the historian archive.
+        /// Inserts values into the historian archive.
         /// </summary>
         /// <param name="values">The values to insert.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
@@ -266,7 +246,7 @@ namespace Aika {
         /// </summary>
         /// <param name="update">The updated tag settings.</param>
         /// <exception cref="ArgumentNullException"><paramref name="update"/> is <see langword="null"/>.</exception>
-        public virtual void Update(TagDefinitionUpdate update) {
+        public virtual void Update(TagSettings update) {
             if (update == null) {
                 throw new ArgumentNullException(nameof(update));
             }

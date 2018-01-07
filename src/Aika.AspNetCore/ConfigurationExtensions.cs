@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Aika.AspNetCore {
 
@@ -24,6 +26,35 @@ namespace Aika.AspNetCore {
         /// The <paramref name="services"/> container, to allow chaining.
         /// </returns>
         public static IServiceCollection AddAikaHistorian<T>(this IServiceCollection services) where T : class, IHistorian {
+            return services.AddAikaHistorian<T>(null, null);
+        }
+
+
+        /// <summary>
+        /// Adds an Aika historian service to the specified services container.
+        /// </summary>
+        /// <typeparam name="T">The <see cref="IHistorian"/> implementation to use with the <see cref="AikaHistorian"/>.</typeparam>
+        /// <param name="services">The services container to add the historian service to.</param>
+        /// <param name="options">The Aika service options.</param>
+        /// <returns>
+        /// The <paramref name="services"/> container, to allow chaining.
+        /// </returns>
+        public static IServiceCollection AddAikaHistorian<T>(this IServiceCollection services, AikaServiceOptions options) where T : class, IHistorian {
+            return services.AddAikaHistorian<T>(null, options);
+        }
+
+
+        /// <summary>
+        /// Adds an Aika historian service to the specified services container.
+        /// </summary>
+        /// <typeparam name="T">The <see cref="IHistorian"/> implementation to use with the <see cref="AikaHistorian"/>.</typeparam>
+        /// <param name="services">The services container to add the historian service to.</param>
+        /// <param name="historianFactory">The factory to create the singleton instance of <typeparamref name="T"/> with.</param>
+        /// <param name="options">The Aika service options.</param>
+        /// <returns>
+        /// The <paramref name="services"/> container, to allow chaining.
+        /// </returns>
+        public static IServiceCollection AddAikaHistorian<T>(this IServiceCollection services, Func<IServiceProvider, T> historianFactory, AikaServiceOptions options) where T : class, IHistorian {
             if (services == null) {
                 throw new ArgumentNullException(nameof(services));
             }
@@ -32,8 +63,18 @@ namespace Aika.AspNetCore {
             services.AddSingleton<IHostedService>(x => x.GetService<TaskRunner>());
             services.AddSingleton<ITaskRunner>(x => x.GetService<TaskRunner>());
 
-            services.AddSingleton<IHistorian, T>();
+            if (historianFactory == null) {
+                services.AddSingleton<IHistorian, T>();
+            }
+            else {
+                services.AddSingleton<IHistorian, T>(historianFactory);
+            }
             services.AddSingleton<AikaHistorian>();
+
+            services.AddSingleton<IHostedService, AikaService>(x => {
+                var aika = x.GetService<AikaHistorian>();
+                return new AikaService(aika, options ?? new AikaServiceOptions(), x.GetService<ILogger<AikaService>>());
+            });
 
             return services;
         }

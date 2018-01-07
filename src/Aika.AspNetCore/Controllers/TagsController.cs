@@ -15,7 +15,7 @@ namespace Aika.AspNetCore.Controllers {
     /// <summary>
     /// API controller for performing tag data queries.
     /// </summary>
-    [Route("aika/api/[controller]")]
+    [Route("aika/api/tags")]
     [Authorize(Policy = Authorization.Policies.ReadTagData)]
     public class TagsController : Controller {
 
@@ -107,16 +107,46 @@ namespace Aika.AspNetCore.Controllers {
         /// Gets the available state set definitions (i.e. the sets of named states that discrete, state-based tags can use).
         /// </summary>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <param name="name">The state set name filter.</param>
+        /// <param name="pageSize">The query page size to use.</param>
+        /// <param name="page">The query results page to return.</param>
         /// <returns>
-        /// The content of a successful response will be the defined state sets, indexed by set name.
+        /// The content of a successful response will be the matching state sets.
         /// </returns>
         [HttpGet]
         [Route("statesets")]
-        [ProducesResponseType(200, Type = typeof(IDictionary<string, StateSetDto>))]
-        public async Task<IActionResult> GetStateSets(CancellationToken cancellationToken) {
+        [ProducesResponseType(200, Type = typeof(IEnumerable<StateSetDto>))]
+        public Task<IActionResult> GetStateSets(CancellationToken cancellationToken, [FromQuery] string name = null, int pageSize = 50, int page = 1) {
+            var filter = new StateSetSearchRequest() {
+                Name = name,
+                PageSize = pageSize,
+                Page = page
+            };
+
+            TryValidateModel(filter);
+            return GetStateSets(filter, cancellationToken);
+        }
+
+
+        /// <summary>
+        /// Gets the available state set definitions (i.e. the sets of named states that discrete, state-based tags can use).
+        /// </summary>
+        /// <param name="filter">The state set search filter.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The content of a successful response will be the matching state sets.
+        /// </returns>
+        [HttpPost]
+        [Route("statesets")]
+        [ProducesResponseType(200, Type = typeof(IEnumerable<StateSetDto>))]
+        public async Task<IActionResult> GetStateSets([FromBody] StateSetSearchRequest filter, CancellationToken cancellationToken) {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState); // 400
+            }
+
             try {
-                var result = await _historian.GetStateSets(User, cancellationToken).ConfigureAwait(false);
-                return Ok(result.Values.OrderBy(x => x.Name).ToDictionary(x => x.Name, x => x.ToStateSetDto())); // 200
+                var result = await _historian.GetStateSets(User, filter.ToStateSetFilter(), cancellationToken).ConfigureAwait(false);
+                return Ok(result.Select(x => x.ToStateSetDto()).ToArray()); // 200
             }
             catch (ArgumentException) {
                 return BadRequest(); // 400

@@ -12,7 +12,7 @@ namespace Aika {
     public interface ITagManager {
 
         /// <summary>
-        /// When implemented in a derived type, gets the total number of configured tags.
+        /// Gets the total number of configured tags.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
@@ -24,7 +24,7 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, creates a new tag.
+        /// Creates a new tag.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tag">The tag definition.</param>
@@ -32,11 +32,11 @@ namespace Aika {
         /// <returns>
         /// The new tag definition.
         /// </returns>
-        Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagDefinitionUpdate tag, CancellationToken cancellationToken);
+        Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagSettings tag, CancellationToken cancellationToken);
 
 
         /// <summary>
-        /// When implemented in a derived type, updates a tag.
+        /// Updates a tag.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagId">The ID of the tag to update.</param>
@@ -46,13 +46,13 @@ namespace Aika {
         /// The updated tag definition.
         /// </returns>
         /// <remarks>
-        /// Implementers should call <see cref="TagDefinition.Update(TagDefinitionUpdate)"/> to update the target tag.
+        /// Implementers should call <see cref="TagDefinition.Update(TagSettings)"/> to update the target tag.
         /// </remarks>
-        Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagDefinitionUpdate update, CancellationToken cancellationToken);
+        Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, CancellationToken cancellationToken);
 
 
         /// <summary>
-        /// When implemented in a derived type, deletes a tag.
+        /// Deletes a tag.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagId">The ID of the tag to delete.</param>
@@ -69,7 +69,7 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, creates a new state set.
+        /// Creates a new state set.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="name">The name of the new state set.</param>
@@ -82,7 +82,7 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, updates an existing state set.
+        /// Updates an existing state set.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="name">The name of the state set.</param>
@@ -95,7 +95,7 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, deletes the specified state set.
+        /// Deletes the specified state set.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="name">The name of the state set.</param>

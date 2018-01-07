@@ -16,19 +16,13 @@ namespace Aika.Historians {
         internal ConcurrentDictionary<string, object> Properties { get; } = new ConcurrentDictionary<string, object>();
 
 
-        internal InMemoryTagDefinition(InMemoryHistorian historian, ITaskRunner taskRunner, string id, string name, string description, string units, TagDataType dataType, string stateSet, TagValueFilterSettings exceptionFilterSettings, TagValueFilterSettings compressionFilterSettings, ILoggerFactory loggerFactory) : base(historian, taskRunner, id, name, description, units, dataType, stateSet, exceptionFilterSettings, compressionFilterSettings, null, null, null, null, loggerFactory) {
+        internal InMemoryTagDefinition(InMemoryHistorian historian, string id, TagSettings tagSettings) : base(historian, id, tagSettings, null, null, null, null) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
         }
 
 
         public override IDictionary<string, object> GetProperties() {
             return Properties.ToDictionary(x => x.Key, x => x.Value);
-        }
-
-
-        public override Task<TagValue> GetLastArchivedValue(CancellationToken cancellationToken) {
-            var value = _historian.GetLastArchivedValue(Id);
-            return Task.FromResult(value);
         }
 
 

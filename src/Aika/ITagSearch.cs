@@ -13,7 +13,7 @@ namespace Aika {
     public interface ITagSearch {
 
         /// <summary>
-        /// When implemented in a derived type, performs a tag search.
+        /// Gets the tags that match the specified filter.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="filter">The tag search filter.</param>
@@ -25,10 +25,10 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, gets the definitions for the specified tags.
+        /// Gets the definitions for the specified tags.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagIdsOrNames">The names of the tags to retrieve.</param>
+        /// <param name="tagIdsOrNames">The names or IDs of the tags to retrieve.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// The definitions of the requested tags.
@@ -37,18 +37,19 @@ namespace Aika {
 
 
         /// <summary>
-        /// When implemented in a derived type, gets the defined state sets.
+        /// Gets the state sets that match the specified filter.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
+        /// <param name="filter">The state set filter.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// The state sets defined by the historian, indexed by set name.
         /// </returns>
-        Task<IDictionary<string, StateSet>> GetStateSets(ClaimsPrincipal identity, CancellationToken cancellationToken);
+        Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken);
 
 
         /// <summary>
-        /// When implemented in a derived type, gets the specified state set.
+        /// Gets the specified state set.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="name">The name of the state set.</param>

@@ -88,11 +88,12 @@ namespace Aika.Client.Clients {
         /// possible values for the tag.  Authorized using the <c>aika:managetags</c> authorization 
         /// policy.
         /// </summary>
+        /// <param name="filter">The state set search filter.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// A task that will return all of the defined state sets, indexed by name.
+        /// A task that will return the matching state sets.
         /// </returns>
-        Task<IDictionary<string, StateSetDto>> GetStateSets(CancellationToken cancellationToken);
+        Task<IEnumerable<StateSetDto>> GetStateSets(StateSetSearchRequest filter, CancellationToken cancellationToken);
 
 
         /// <summary>

@@ -6,9 +6,9 @@ using System.Text;
 namespace Aika {
 
     /// <summary>
-    /// Describes an update to a historian tag.
+    /// Describes settings that can be used to configure a <see cref="TagDefinition"/>.
     /// </summary>
-    public class TagDefinitionUpdate {
+    public class TagSettings {
 
         /// <summary>
         /// Gets or sets the tag name.
@@ -48,17 +48,17 @@ namespace Aika {
 
 
         /// <summary>
-        /// Creates a new <see cref="TagDefinitionUpdate"/> object.
+        /// Creates a new <see cref="TagSettings"/> object.
         /// </summary>
-        public TagDefinitionUpdate() {}
+        public TagSettings() {}
 
 
         /// <summary>
-        /// Creates a clone of the specified <see cref="TagDefinitionUpdate"/> object.
+        /// Creates a clone of the specified <see cref="TagSettings"/> object.
         /// </summary>
         /// <param name="other">The object to clone.</param>
         /// <exception cref="ArgumentNullException"><paramref name="other"/> is <see langword="null"/>.</exception>
-        internal TagDefinitionUpdate(TagDefinitionUpdate other): this() {
+        internal TagSettings(TagSettings other): this() {
             if (other == null) {
                 throw new ArgumentNullException(nameof(other));
             }

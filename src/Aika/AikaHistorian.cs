@@ -38,25 +38,14 @@ namespace Aika {
         }
 
         /// <summary>
-        /// The back-end historian instance, cast to an <see cref="ITagDataReader"/>.  This will be 
-        /// <see langword="null"/> if the underlying <see cref="IHistorian"/> does not support 
-        /// reading tag data.
+        /// Flags if <see cref="Init(CancellationToken)"/> has been successfully called.
         /// </summary>
-        private readonly ITagDataReader _dataReader;
+        private bool _isInitialized;
 
         /// <summary>
-        /// The back-end historian instance, cast to an <see cref="ITagDataWriter"/>.  This will be 
-        /// <see langword="null"/> if the underlying <see cref="IHistorian"/> does not support 
-        /// writing tag data.
+        /// Flags if <see cref="Init(CancellationToken)"/> is currently executing.
         /// </summary>
-        private readonly ITagDataWriter _dataWriter;
-
-        /// <summary>
-        /// The back-end historian instance, cast to an <see cref="ITagManager"/>.  This will be 
-        /// <see langword="null"/> if the underlying <see cref="IHistorian"/> does not support tag 
-        /// management.
-        /// </summary>
-        private readonly ITagManager _tagManager;
+        private bool _isInitializing;
 
         /// <summary>
         /// Gets the UTC startup time for the <see cref="AikaHistorian"/>.
@@ -71,11 +60,31 @@ namespace Aika {
         /// <param name="loggerFactory">The <see cref="ILoggerFactory"/> to use.</param>
         public AikaHistorian(IHistorian historian, ILoggerFactory loggerFactory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
-            _dataReader = _historian as ITagDataReader;
-            _dataWriter = _historian as ITagDataWriter;
-            _tagManager = _historian as ITagManager;
             _loggerFactory = loggerFactory;
             _logger = _loggerFactory?.CreateLogger<AikaHistorian>();
+        }
+
+
+        /// <summary>
+        /// Initializes the <see cref="AikaHistorian"/>.
+        /// </summary>
+        /// <param name="cancellationToken">A cancellation token that can be used to cancel initialization.</param>
+        /// <returns>
+        /// A task that will initialize the historian.
+        /// </returns>
+        public async Task Init(CancellationToken cancellationToken) {
+            if (_isInitialized || _isInitializing) {
+                return;
+            }
+
+            _isInitializing = true;
+            try {
+                await RunWithImmediateCancellation(Historian.Init(cancellationToken), cancellationToken).ConfigureAwait(false);
+                _isInitialized = true;
+            }
+            finally {
+                _isInitializing = false;
+            }
         }
 
 
@@ -96,6 +105,36 @@ namespace Aika {
             return task.Result;
         }
 
+
+        /// <summary>
+        /// Waits for a task to complete, but immediately cancels as soon as the specified <see cref="CancellationToken"/> fires.
+        /// </summary>
+        /// <param name="task">The task to wait on.</param>
+        /// <param name="cancellationToken">The cancellation token to observe.</param>
+        /// <returns>
+        /// The result of the <paramref name="task"/>.
+        /// </returns>
+        /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> fires before <paramref name="task"/> completes.</exception>
+        private async Task RunWithImmediateCancellation(Task task, CancellationToken cancellationToken) {
+            await Task.WhenAny(task, Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+
+        /// <summary>
+        /// Throws an <see cref="InvalidOperationException"/> if the underlying historian is not ready yet.
+        /// </summary>
+        private void ThrowIfNotReady() {
+            if (!_isInitialized || !_historian.IsInitialized) {
+                if (_isInitializing) {
+                    throw new InvalidOperationException("The historian is still initializing.");
+                }
+                else {
+                    throw new InvalidOperationException($"The historian has not been initialized.  Call the {nameof(Init)} method to initialize.");
+                }
+            }
+        }
+
         #region [ Tag Searches and Data Queries ]
 
         /// <summary>
@@ -108,6 +147,7 @@ namespace Aika {
         /// A task that will return matching tag definitions.
         /// </returns>
         public async Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+            ThrowIfNotReady();
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -161,16 +201,13 @@ namespace Aika {
         /// Gets the specified tag definitions.
         /// </summary>
         /// <param name="identity">The identity of the calling user.</param>
-        /// <param name="tagNames">The IDs or names of the tags to retrieve.</param>
+        /// <param name="tagIdsOrNames">The IDs or names of the tags to retrieve.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A task that will return the tag definitions.
         /// </returns>
-        /// <exception cref="NotSupportedException">The underlying <see cref="IHistorian"/> does not implement <see cref="ITagDataReader"/>.</exception>
         public Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
-            if (_dataReader == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
             return GetTags(identity, tagIdsOrNames, null, cancellationToken);
         }
 
@@ -185,7 +222,7 @@ namespace Aika {
         /// for these functions if they are not supported natively by the underlying <see cref="IHistorian"/>.
         /// </returns>
         private async Task<IEnumerable<DataQueryFunction>> GetAvailableNativeDataQueryFunctions(CancellationToken cancellationToken) {
-            return await RunWithImmediateCancellation(_dataReader.GetAvailableDataQueryFunctions(cancellationToken), cancellationToken).ConfigureAwait(false);
+            return await RunWithImmediateCancellation(_historian.GetAvailableDataQueryFunctions(cancellationToken), cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -200,10 +237,7 @@ namespace Aika {
         /// for these functions if they are not supported natively by the underlying <see cref="IHistorian"/>.
         /// </returns>
         public async Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
-            if (_dataReader == null) {
-                throw new NotSupportedException();
-            }
-
+            ThrowIfNotReady();
             var nativeFunctions = await GetAvailableNativeDataQueryFunctions(cancellationToken).ConfigureAwait(false);
             return nativeFunctions.Concat(DataQueryFunction.DefaultFunctions).Distinct().ToArray();
         }
@@ -220,9 +254,7 @@ namespace Aika {
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         public async Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
-            if (_dataReader == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
 
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
@@ -237,7 +269,7 @@ namespace Aika {
                 throw new ArgumentException("You must specify at least one non-empty tag name.", nameof(tagNames));
             }
 
-            var authResult = await RunWithImmediateCancellation(_dataReader.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var authResult = await RunWithImmediateCancellation(_historian.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
 
             var authorisedTagNames = authResult.Where(x => x.Value).Select(x => x.Key).ToArray();
             var unauthorisedTagNames = authResult.Where(x => !x.Value).Select(x => x.Key).ToArray();
@@ -248,7 +280,7 @@ namespace Aika {
                 result = new Dictionary<string, TagValueCollection>();
             }
             else {
-                result = await RunWithImmediateCancellation(_dataReader.ReadRawData(identity, authorisedTagNames, utcStartTime, utcEndTime, pointCount, cancellationToken), cancellationToken).ConfigureAwait(false);
+                result = await RunWithImmediateCancellation(_historian.ReadRawData(identity, authorisedTagNames, utcStartTime, utcEndTime, pointCount, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
 
             foreach (var tagName in unauthorisedTagNames) {
@@ -281,10 +313,10 @@ namespace Aika {
         ///   is <see langword="null"/>.
         /// </param>
         /// <param name="pointCount">
-        ///   The sample count to use.  For <see cref="DataQueryFunction.Raw"/> requests, this is the maximum 
-        ///   number of samples to return per tag.  Note that the underlying <see cref="IHistorian"/> itself 
-        ///   may place additional constraints on the maximum value of this parameter.  Specify <see langword="null"/>
-        ///   to use the <paramref name="sampleInterval"/> instead.
+        ///   The sample count to use.  Note that the underlying <see cref="IHistorian"/> itself 
+        ///   may place additional constraints on the maximum value of this parameter.  
+        ///   Specify <see langword="null"/> to use the <paramref name="sampleInterval"/> 
+        ///   instead.
         /// </param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
@@ -304,7 +336,7 @@ namespace Aika {
                 throw new ArgumentException("You must specify at least one non-empty tag name.", nameof(tagNames));
             }
 
-            var authResult = await RunWithImmediateCancellation(_dataReader.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var authResult = await RunWithImmediateCancellation(_historian.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
 
             var authorisedTagNames = authResult.Where(x => x.Value).Select(x => x.Key).ToArray();
             var unauthorisedTagNames = authResult.Where(x => !x.Value).Select(x => x.Key).ToArray();
@@ -325,8 +357,8 @@ namespace Aika {
                     // request to the there.
 
                     query = pointCount.HasValue
-                        ? _dataReader.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
-                        : _dataReader.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
+                        ? _historian.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
+                        : _historian.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
                 }
                 else if (AggregationUtility.IsSupportedFunction(dataFunction)) {
                     // For functions that are not supported by the underlying historian but are 
@@ -346,7 +378,7 @@ namespace Aika {
                     }
                     var queryStartTime = utcStartTime.Subtract(sampleInterval);
 
-                    query = _dataReader.ReadRawData(identity, authorisedTagNames, queryStartTime, utcEndTime, 0, cancellationToken).ContinueWith(t => {
+                    query = _historian.ReadRawData(identity, authorisedTagNames, queryStartTime, utcEndTime, 0, cancellationToken).ContinueWith(t => {
                         var aggregator = new AggregationUtility(_loggerFactory);
                         // We'll hint that PLOT and INTERP data can be interpolated on a chart, but 
                         // other functions should use trailing-edge transitions.
@@ -406,27 +438,19 @@ namespace Aika {
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
-            if (_dataReader == null) {
-                throw new NotSupportedException();
-            }
-
+            ThrowIfNotReady();
             return ReadProcessedData(identity, tagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, null, cancellationToken);
         }
 
 
         public Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
-            if (_dataReader == null) {
-                throw new NotSupportedException();
-            }
-
+            ThrowIfNotReady();
             return ReadProcessedData(identity, tagNames, dataFunction, utcStartTime, utcEndTime, TimeSpan.Zero, pointCount, cancellationToken);
         }
 
 
         public async Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            if (_dataReader == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
 
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
@@ -441,7 +465,7 @@ namespace Aika {
                 throw new ArgumentException("You must specify at least one non-empty tag name.", nameof(tagNames));
             }
 
-            var authResult = await RunWithImmediateCancellation(_dataReader.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var authResult = await RunWithImmediateCancellation(_historian.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
 
             var authorisedTagNames = authResult.Where(x => x.Value).Select(x => x.Key).ToArray();
             var unauthorisedTagNames = authResult.Where(x => !x.Value).Select(x => x.Key).ToArray();
@@ -452,7 +476,7 @@ namespace Aika {
                 result = new Dictionary<string, TagValue>();
             }
             else {
-                var query = _dataReader.ReadSnapshotData(identity, authorisedTagNames, cancellationToken);
+                var query = _historian.ReadSnapshotData(identity, authorisedTagNames, cancellationToken);
                 result = await RunWithImmediateCancellation(query, cancellationToken);
             }
 
@@ -475,9 +499,7 @@ namespace Aika {
         /// changes as they occur.
         /// </returns>
         public SnapshotSubscription CreateSnapshotSubscription(ClaimsPrincipal identity) {
-            if (_dataReader == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
 
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
@@ -493,7 +515,7 @@ namespace Aika {
         private Task<IEnumerable<TagDefinition>> GetWriteableTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
             var task = GetTags(identity,
                                tagNames,
-                               (id, n, ct) => _dataWriter.CanWriteTagData(id, n, ct),
+                               (id, n, ct) => _historian.CanWriteTagData(id, n, ct),
                                cancellationToken);
 
             return RunWithImmediateCancellation(task, cancellationToken);
@@ -509,12 +531,9 @@ namespace Aika {
         /// <returns>
         /// The results of the insert, indexed by tag name.
         /// </returns>
-        /// <exception cref="NotSupportedException">The underlying <see cref="IHistorian"/> does not implement <see cref="ITagDataWriter"/>.</exception>
         /// <exception cref="SecurityException">The calling <paramref name="identity"/> is not authorized to write tag data.</exception>
         public async Task<IDictionary<string, WriteTagValuesResult>> InsertTagData(ClaimsPrincipal identity, IDictionary<string, IEnumerable<TagValue>> values, CancellationToken cancellationToken) {
-            if (_dataWriter == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
 
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
@@ -588,12 +607,9 @@ namespace Aika {
         /// <returns>
         /// The results of the write, indexed by tag name.
         /// </returns>
-        /// <exception cref="NotSupportedException">The underlying <see cref="IHistorian"/> does not implement <see cref="ITagDataWriter"/>.</exception>
         /// <exception cref="SecurityException">The calling <paramref name="identity"/> is not authorized to write tag data.</exception>
         public async Task<IDictionary<string, WriteTagValuesResult>> WriteTagData(ClaimsPrincipal identity, IDictionary<string, IEnumerable<TagValue>> values, CancellationToken cancellationToken) {
-            if (_dataWriter == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
 
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
@@ -643,11 +659,8 @@ namespace Aika {
         #region [ Tag Management ]
 
         public async Task<int?> GetTagCount(ClaimsPrincipal identity, CancellationToken cancellationToken) {
-            if (_tagManager == null) {
-                throw new NotSupportedException();
-            }
-
-            return await _tagManager.GetTagCount(identity, cancellationToken).ConfigureAwait(false);
+            ThrowIfNotReady();
+            return await _historian.GetTagCount(identity, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -675,16 +688,14 @@ namespace Aika {
         }
 
 
-        public async Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagDefinitionUpdate tag, CancellationToken cancellationToken) {
-            if (_tagManager == null) {
-                throw new NotSupportedException();
-            }
+        public async Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagSettings tag, CancellationToken cancellationToken) {
+            ThrowIfNotReady();
 
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
             }
 
-            tag = new TagDefinitionUpdate(tag);
+            tag = new TagSettings(tag);
 
             if (tag.ExceptionFilterSettings != null) {
                 tag.ExceptionFilterSettings = GetFilterSettings(tag.DataType, tag.ExceptionFilterSettings);
@@ -700,14 +711,12 @@ namespace Aika {
                 tag.CompressionFilterSettings = GetDefaultFilterSettings(tag.DataType);
             }
 
-            return await _tagManager.CreateTag(identity, tag, cancellationToken).ConfigureAwait(false);
+            return await _historian.CreateTag(identity, tag, cancellationToken).ConfigureAwait(false);
         }
 
 
-        public async Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagDefinitionUpdate tag, CancellationToken cancellationToken) {
-            if (_tagManager == null) {
-                throw new NotSupportedException();
-            }
+        public async Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings tag, CancellationToken cancellationToken) {
+            ThrowIfNotReady();
 
             if (String.IsNullOrWhiteSpace(tagId)) {
                 throw new ArgumentException("You must specify a tag ID.", nameof(tagId));
@@ -725,33 +734,35 @@ namespace Aika {
                 tag.CompressionFilterSettings = GetFilterSettings(tag.DataType, tag.CompressionFilterSettings);
             }
 
-            return await _tagManager.UpdateTag(identity, tagId, tag, cancellationToken).ConfigureAwait(false);
+            return await _historian.UpdateTag(identity, tagId, tag, cancellationToken).ConfigureAwait(false);
         }
 
 
         public async Task<bool> DeleteTag(ClaimsPrincipal identity, string tagIdOrName, CancellationToken cancellationToken) {
-            if (_tagManager == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
 
             if (String.IsNullOrWhiteSpace(tagIdOrName)) {
                 throw new ArgumentException("You must specify a tag ID or name.", nameof(tagIdOrName));
             }
 
-            return await _tagManager.DeleteTag(identity, tagIdOrName, cancellationToken).ConfigureAwait(false);
+            return await _historian.DeleteTag(identity, tagIdOrName, cancellationToken).ConfigureAwait(false);
         }
 
 
-        public async Task<IDictionary<string, StateSet>> GetStateSets(ClaimsPrincipal identity, CancellationToken cancellationToken) {
+        public async Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {
+            ThrowIfNotReady();
+
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            return await _historian.GetStateSets(identity, cancellationToken).ConfigureAwait(false);
+            return await _historian.GetStateSets(identity, filter, cancellationToken).ConfigureAwait(false);
         }
 
 
         public async Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
+            ThrowIfNotReady();
+
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -764,9 +775,7 @@ namespace Aika {
 
 
         public async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
-            if (_tagManager == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
 
             if (String.IsNullOrWhiteSpace(name)) {
                 throw new ArgumentException("You must specify a state set name.", nameof(name));
@@ -778,14 +787,12 @@ namespace Aika {
                 throw new ArgumentNullException("You must specify at least one state.", nameof(states));
             }
 
-            return await _tagManager.CreateStateSet(identity, name, nonNullStates, cancellationToken).ConfigureAwait(false);
+            return await _historian.CreateStateSet(identity, name, nonNullStates, cancellationToken).ConfigureAwait(false);
         }
 
 
         public async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
-            if (_tagManager == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
 
             if (String.IsNullOrWhiteSpace(name)) {
                 throw new ArgumentException("You must specify a state set name.", nameof(name));
@@ -797,20 +804,18 @@ namespace Aika {
                 throw new ArgumentNullException("You must specify at least one state.", nameof(states));
             }
 
-            return await _tagManager.UpdateStateSet(identity, name, nonNullStates, cancellationToken).ConfigureAwait(false);
+            return await _historian.UpdateStateSet(identity, name, nonNullStates, cancellationToken).ConfigureAwait(false);
         }
 
 
         public async Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
-            if (_tagManager == null) {
-                throw new NotSupportedException();
-            }
+            ThrowIfNotReady();
 
             if (String.IsNullOrWhiteSpace(name)) {
                 throw new ArgumentException("You must specify a state set name.", nameof(name));
             }
 
-            return await _tagManager.DeleteStateSet(identity, name, cancellationToken).ConfigureAwait(false);
+            return await _historian.DeleteStateSet(identity, name, cancellationToken).ConfigureAwait(false);
         }
 
         #endregion

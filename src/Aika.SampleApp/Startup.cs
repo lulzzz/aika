@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Aika.AspNetCore;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.PlatformAbstractions;
 
 namespace Aika.SampleApp {
 
@@ -83,11 +85,13 @@ namespace Aika.SampleApp {
             // Add SignalR.
             services.AddSignalR();
 
-            //// Add our sample data generator.
+            // Add our sample data generator.
             services.AddSingleton<IHostedService, SampleDataGenerator>();
 
             services.AddSwaggerGen(x => {
                 x.SwaggerDoc("v1", new Swashbuckle.AspNetCore.Swagger.Info { Title = "Aika API", Version = "v1" });
+                var filePath = Path.Combine(PlatformServices.Default.Application.ApplicationBasePath, "Aika.AspNetCore.xml");
+                x.IncludeXmlComments(filePath);
             });
         }
 
