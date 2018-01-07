@@ -202,9 +202,6 @@ namespace Aika {
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         public async Task<WriteTagValuesResult> WriteSnapshotValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
-            if (identity == null) {
-                throw new ArgumentNullException(nameof(identity));
-            }
             var stateSet = await GetStateSet(identity, cancellationToken).ConfigureAwait(false);
 
             var currentSnapshot = SnapshotValue;
@@ -265,9 +262,6 @@ namespace Aika {
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         public async Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
-            if (identity == null) {
-                throw new ArgumentNullException(nameof(identity));
-            }
             var stateSet = await GetStateSet(identity, cancellationToken).ConfigureAwait(false);
 
             if (stateSet != null) {
