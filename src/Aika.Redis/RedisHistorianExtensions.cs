@@ -53,7 +53,7 @@ namespace Aika.Redis {
         /// The Redis key for the tag's raw data.
         /// </returns>
         internal static string GetKeyForRawData(this RedisHistorian historian, string tagId) {
-            return $"{historian.GetKeyPrefixForTag(tagId)}:rawValues";
+            return $"{historian.GetKeyPrefixForTag(tagId)}:archive";
         }
 
 
@@ -65,7 +65,7 @@ namespace Aika.Redis {
         /// The Redis key for the tag's snapshot value.
         /// </returns>
         internal static string GetKeyForSnapshotData(this RedisHistorian historian, string tagId) {
-            return $"{historian.GetKeyPrefixForTag(tagId)}:snapshotValue";
+            return $"{historian.GetKeyPrefixForTag(tagId)}:snapshot";
         }
 
     }
