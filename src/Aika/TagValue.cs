@@ -76,45 +76,5 @@ namespace Aika {
             return new TagValue(utcSampleTime, Double.NaN, Resources.TagValue_Unauthorized, TagValueQuality.Bad, null);
         }
 
-
-        /// <summary>
-        /// Attempts to create a new <see cref="TagValue"/> from a <see cref="StateSet"/>, based on an existing value.
-        /// </summary>
-        /// <param name="stateSet">The state set to use.</param>
-        /// <param name="template">The value to copy from.</param>
-        /// <param name="value">A new <see cref="TagValue"/> that uses the correct name and numeric value of the matching state.</param>
-        /// <returns>
-        /// A flag that indicates if <paramref name="template"/> could be mapped to a state in the 
-        /// <paramref name="stateSet"/>.
-        /// </returns>
-        /// <exception cref="ArgumentNullException"><paramref name="stateSet"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentNullException"><paramref name="template"/> is <see langword="null"/>.</exception>
-        public static bool TryCreateFromStateSet(StateSet stateSet, TagValue template, out TagValue value) {
-            if (stateSet == null) {
-                throw new ArgumentNullException(nameof(stateSet));
-            }
-            if (template == null) {
-                throw new ArgumentNullException(nameof(template));
-            }
-
-            StateSetItem state = null;
-            if (!String.IsNullOrWhiteSpace(template.TextValue)) {
-                state = stateSet[template.TextValue];
-            }
-
-            if (state == null) {
-                var valAsInt = (int) template.NumericValue;
-                state = stateSet.States.FirstOrDefault(x => x.Value == valAsInt);
-            }
-
-            if (state == null) {
-                value = null;
-                return false;
-            }
-
-            value = new TagValue(template.UtcSampleTime, state.Value, state.Name, template.Quality, null);
-            return true;
-        }
-
     }
 }

@@ -187,6 +187,15 @@ namespace Aika {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The tag&apos;s state set is required..
+        /// </summary>
+        internal static string Error_TagStateSetIsRequired {
+            get {
+                return ResourceManager.GetString("Error_TagStateSetIsRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Unsupported data function..
         /// </summary>
         internal static string Error_UnsupportedDataFunction {

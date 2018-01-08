@@ -78,6 +78,7 @@ namespace Aika.AspNetCore {
 
             return new StateSetDto() {
                 Name = stateSet.Name,
+                Description = stateSet.Description,
                 States = stateSet.Select(x => x.ToStateSetItemDto()).ToArray()
             };
         }
@@ -96,6 +97,27 @@ namespace Aika.AspNetCore {
             return new StateSetItemDto() {
                 Name = item.Name,
                 Value = item.Value
+            };
+        }
+
+
+        /// <summary>
+        /// Converts the object to the equivalent <see cref="StateSetSettings"/>.
+        /// </summary>
+        /// <param name="stateSet">The item to convert.</param>
+        /// <returns>
+        /// The equivalent <see cref="StateSetSettings"/>.
+        /// </returns>
+        ///  <exception cref="ArgumentNullException"><paramref name="stateSet"/> is <see langword="null"/>.</exception>
+        internal static StateSetSettings ToStateSetSettings(this StateSetDto stateSet) {
+            if (stateSet == null) {
+                throw new ArgumentNullException(nameof(stateSet));
+            }
+
+            return new StateSetSettings() {
+                Name = stateSet.Name,
+                Description = stateSet.Description,
+                States = stateSet.States?.Select(x => x.ToStateSetItem()).ToArray() ?? new StateSetItem[0]
             };
         }
 

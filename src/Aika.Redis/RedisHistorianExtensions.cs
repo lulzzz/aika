@@ -102,7 +102,7 @@ namespace Aika.Redis {
         /// explanation: https://stackexchange.github.io/StackExchange.Redis/KeysScan
         /// </remarks>
         internal static string GetKeyForStateSetNamesList(this RedisHistorian historian) {
-            return historian.GetKeyPrefixForTag("names");
+            return historian.GetKeyPrefixForStateSet("names");
         }
 
 

@@ -151,7 +151,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
             }
 
             try {
-                var result = await _historian.CreateStateSet(User, stateSet.Name, stateSet.States.Where(x => x != null).Select(x => x.ToStateSetItem()).ToArray(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.CreateStateSet(User, stateSet.ToStateSetSettings(), cancellationToken).ConfigureAwait(false);
                 return CreatedAtRoute("GetStateSetByName", new { name = result.Name }, result); // 201
             }
             catch (ArgumentException) {
@@ -190,7 +190,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
             }
             
             try {
-                var result = await _historian.UpdateStateSet(User, name, stateSet.States?.Where(x => x != null).Select(x => x.ToStateSetItem()).ToArray(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.UpdateStateSet(User, name, stateSet.ToStateSetSettings(), cancellationToken).ConfigureAwait(false);
                 return Ok(result); // 200
             }
             catch (ArgumentException) {

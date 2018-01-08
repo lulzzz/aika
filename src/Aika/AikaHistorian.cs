@@ -787,19 +787,21 @@ namespace Aika {
 
 
         /// <summary>
-        /// Validates the specified data filter settings.
+        /// Validates the specified exception filter settings.
         /// </summary>
         /// <param name="dataType">The data type of the tag that the settings are for.</param>
         /// <param name="settings">The settings to validate.</param>
         /// <returns>
         /// A validated <see cref="TagValueFilterSettingsUpdate"/> instance.
         /// </returns>
-        private TagValueFilterSettingsUpdate ValidateFilterSettings(TagDataType dataType, TagValueFilterSettingsUpdate settings) {
+        private TagValueFilterSettingsUpdate ValidateExceptionFilterSettings(TagDataType dataType, TagValueFilterSettingsUpdate settings) {
             return new TagValueFilterSettingsUpdate() {
                 IsEnabled = settings.IsEnabled,
-                LimitType = settings.LimitType ?? TagValueFilterDeviationType.Absolute,
+                LimitType = dataType == TagDataType.State || dataType == TagDataType.Text
+                    ? TagValueFilterDeviationType.Absolute 
+                    : settings.LimitType ?? TagValueFilterDeviationType.Absolute,
                 Limit = dataType == TagDataType.State
-                        ? 1
+                        ? 0.5
                         : settings.Limit ?? 0,
                 WindowSize = settings.WindowSize ?? TagValueFilterSettings.DefaultWindowSize
             };
@@ -807,19 +809,66 @@ namespace Aika {
 
 
         /// <summary>
-        /// Gets default data filter settings for the specified tag data type.
+        /// Validates the specified compression filter settings.
+        /// </summary>
+        /// <param name="dataType">The data type of the tag that the settings are for.</param>
+        /// <param name="settings">The settings to validate.</param>
+        /// <returns>
+        /// A validated <see cref="TagValueFilterSettingsUpdate"/> instance.
+        /// </returns>
+        private TagValueFilterSettingsUpdate ValidateCompressionFilterSettings(TagDataType dataType, TagValueFilterSettingsUpdate settings) {
+            // Disable compression for state and text tags.
+            if (dataType == TagDataType.State || dataType == TagDataType.Text) {
+                return new TagValueFilterSettingsUpdate() {
+                    IsEnabled = false
+                };
+            }
+
+            return new TagValueFilterSettingsUpdate() {
+                IsEnabled = settings.IsEnabled,
+                LimitType = settings.LimitType ?? TagValueFilterDeviationType.Absolute,
+                Limit = settings.Limit ?? 0,
+                WindowSize = settings.WindowSize ?? TagValueFilterSettings.DefaultWindowSize
+            };
+        }
+
+
+        /// <summary>
+        /// Gets default exception filter settings for the specified tag data type.
         /// </summary>
         /// <param name="dataType">The tag data type.</param>
         /// <returns>
         /// The default <see cref="TagValueFilterSettingsUpdate"/> for the data type.
         /// </returns>
-        private TagValueFilterSettingsUpdate GetDefaultFilterSettings(TagDataType dataType) {
+        private TagValueFilterSettingsUpdate GetDefaultExceptionFilterSettings(TagDataType dataType) {
             return new TagValueFilterSettingsUpdate() {
                 IsEnabled = true,
                 LimitType = TagValueFilterDeviationType.Absolute,
-                Limit = dataType == TagDataType.State
-                        ? 1
-                        : 0,
+                Limit = 0,
+                WindowSize = TagValueFilterSettings.DefaultWindowSize
+            };
+        }
+
+
+        /// <summary>
+        /// Gets default compression filter settings for the specified tag data type.
+        /// </summary>
+        /// <param name="dataType">The tag data type.</param>
+        /// <returns>
+        /// The default <see cref="TagValueFilterSettingsUpdate"/> for the data type.
+        /// </returns>
+        private TagValueFilterSettingsUpdate GetDefaultCompressionFilterSettings(TagDataType dataType) {
+            // Disable compression for state and text tags.
+            if (dataType == TagDataType.State || dataType == TagDataType.Text) {
+                return new TagValueFilterSettingsUpdate() {
+                    IsEnabled = false
+                };
+            }
+
+            return new TagValueFilterSettingsUpdate() {
+                IsEnabled = true,
+                LimitType = TagValueFilterDeviationType.Absolute,
+                Limit = 0,
                 WindowSize = TagValueFilterSettings.DefaultWindowSize
             };
         }
@@ -851,17 +900,17 @@ namespace Aika {
             settings = new TagSettings(settings);
 
             if (settings.ExceptionFilterSettings != null) {
-                settings.ExceptionFilterSettings = ValidateFilterSettings(settings.DataType, settings.ExceptionFilterSettings);
+                settings.ExceptionFilterSettings = ValidateExceptionFilterSettings(settings.DataType, settings.ExceptionFilterSettings);
             }
             else {
-                settings.ExceptionFilterSettings = GetDefaultFilterSettings(settings.DataType);
+                settings.ExceptionFilterSettings = GetDefaultExceptionFilterSettings(settings.DataType);
             }
 
             if (settings.CompressionFilterSettings != null) {
-                settings.CompressionFilterSettings = ValidateFilterSettings(settings.DataType, settings.CompressionFilterSettings);
+                settings.CompressionFilterSettings = ValidateCompressionFilterSettings(settings.DataType, settings.CompressionFilterSettings);
             }
             else {
-                settings.CompressionFilterSettings = GetDefaultFilterSettings(settings.DataType);
+                settings.CompressionFilterSettings = GetDefaultCompressionFilterSettings(settings.DataType);
             }
 
             return await _historian.CreateTag(identity, settings, cancellationToken).ConfigureAwait(false);
@@ -898,11 +947,11 @@ namespace Aika {
             }
 
             if (settings.ExceptionFilterSettings != null) {
-                settings.ExceptionFilterSettings = ValidateFilterSettings(settings.DataType, settings.ExceptionFilterSettings);
+                settings.ExceptionFilterSettings = ValidateExceptionFilterSettings(settings.DataType, settings.ExceptionFilterSettings);
             }
 
             if (settings.CompressionFilterSettings != null) {
-                settings.CompressionFilterSettings = ValidateFilterSettings(settings.DataType, settings.CompressionFilterSettings);
+                settings.CompressionFilterSettings = ValidateCompressionFilterSettings(settings.DataType, settings.CompressionFilterSettings);
             }
 
             return await _historian.UpdateTag(identity, tagId, settings, cancellationToken).ConfigureAwait(false);
@@ -993,40 +1042,39 @@ namespace Aika {
         /// Creates a tag state set.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="name">The name of the state set.</param>
-        /// <param name="states">The states to include in the set.</param>
+        /// <param name="settings">The state set settings.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A task that will return the new state set.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException"><paramref name="name"/> is <see langword="null"/> or white space.</exception>
-        /// <exception cref="ArgumentException">A state set with the same <paramref name="name"/> already exists.</exception>
-        /// <exception cref="ArgumentException"><paramref name="states"/> is <see langword="null"/> or empty.</exception>
-        public async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
+        /// <exception cref="ArgumentException">The <see cref="StateSetSettings.Name"/> in <paramref name="settings"/> is <see langword="null"/> or white space.</exception>
+        /// <exception cref="ArgumentException">A state set with the same name already exists.</exception>
+        /// <exception cref="ArgumentException">The <see cref="StateSetSettings.States"/> property in <paramref name="settings"/> is <see langword="null"/> or empty.</exception>
+        public async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
             ThrowIfNotReady();
 
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            if (String.IsNullOrWhiteSpace(name)) {
-                throw new ArgumentException(Resources.Error_StateSetNameIsRequired, nameof(name));
+            if (String.IsNullOrWhiteSpace(settings?.Name)) {
+                throw new ArgumentException(Resources.Error_StateSetNameIsRequired, nameof(settings));
             }
 
-            var nonNullStates = states?.Where(x => x != null).ToArray() ?? new StateSetItem[0];
+            var nonNullStates = settings?.States?.Where(x => x != null).ToArray() ?? new StateSetItem[0];
 
             if (nonNullStates.Length == 0) {
-                throw new ArgumentException(Resources.Error_AtLeastOneStateIsRequired, nameof(states));
+                throw new ArgumentException(Resources.Error_AtLeastOneStateIsRequired, nameof(settings.States));
             }
 
-            var existing = await _historian.GetStateSet(identity, name, cancellationToken).ConfigureAwait(false);
+            var existing = await _historian.GetStateSet(identity, settings.Name, cancellationToken).ConfigureAwait(false);
             if (existing != null) {
-                throw new ArgumentException(Resources.Error_StateSetAlreadyExists, nameof(name));
+                throw new ArgumentException(Resources.Error_StateSetAlreadyExists, nameof(settings));
             }
 
-            return await _historian.CreateStateSet(identity, name, nonNullStates, cancellationToken).ConfigureAwait(false);
+            return await _historian.CreateStateSet(identity, new StateSetSettings() { Name = settings.Name, Description = settings.Description, States = nonNullStates }, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -1035,7 +1083,7 @@ namespace Aika {
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="name">The name of the state set.</param>
-        /// <param name="states">The states to include in the set.</param>
+        /// <param name="settings">The state set settings.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A task that will return the updated state set.
@@ -1044,8 +1092,8 @@ namespace Aika {
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="name"/> is <see langword="null"/> or white space.</exception>
         /// <exception cref="ArgumentException"><paramref name="name"/> not a known state set.</exception>
-        /// <exception cref="ArgumentException"><paramref name="states"/> is <see langword="null"/> or empty.</exception>
-        public async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
+        /// <exception cref="ArgumentException">The <see cref="StateSetSettings.States"/> property in <paramref name="settings"/> is <see langword="null"/> or empty.</exception>
+        public async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
             ThrowIfNotReady();
 
             if (identity == null) {
@@ -1056,10 +1104,10 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_StateSetNameIsRequired, nameof(name));
             }
 
-            var nonNullStates = states?.Where(x => x != null).ToArray() ?? new StateSetItem[0];
+            var nonNullStates = settings?.States?.Where(x => x != null).ToArray() ?? new StateSetItem[0];
 
             if (nonNullStates.Length == 0) {
-                throw new ArgumentException(Resources.Error_AtLeastOneStateIsRequired, nameof(states));
+                throw new ArgumentException(Resources.Error_AtLeastOneStateIsRequired, nameof(settings));
             }
 
             var existing = await _historian.GetStateSet(identity, name, cancellationToken).ConfigureAwait(false);
@@ -1067,7 +1115,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_StateSetDoesNotExist, nameof(name));
             }
 
-            return await _historian.UpdateStateSet(identity, name, nonNullStates, cancellationToken).ConfigureAwait(false);
+            return await _historian.UpdateStateSet(identity, name, new StateSetSettings() { Description = settings.Description, States = nonNullStates }, cancellationToken).ConfigureAwait(false);
         }
 
 

@@ -140,7 +140,7 @@ namespace Aika {
             UtcLastModifiedAt = utcLastModifiedAt ?? UtcCreatedAt;
 
             SnapshotValue = snapshotValue;
-            DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, SnapshotValue), new CompressionFilterState(compressionFilterSettings, lastArchivedValue, null), _historian.LoggerFactory);
+            DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, SnapshotValue), new CompressionFilterState(compressionFilterSettings, lastArchivedValue, SnapshotValue), _historian.LoggerFactory);
             DataFilter.Archive += values => {
                 if (_logger.IsEnabled(LogLevel.Trace)) {
                     _logger.LogTrace($"[{Name}] Archiving {values.Count()} values emitted by the compression filter.");
@@ -148,7 +148,7 @@ namespace Aika {
 
                 _historian.TaskRunner.RunBackgroundTask(async ct => {
                     try {
-                        await InsertArchiveValues(ClaimsPrincipal.Current, values.ToArray(), ct).ConfigureAwait(false);
+                        await InsertArchiveValuesInternal(ClaimsPrincipal.Current, values.ToArray(), false, ct).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) {
                         // App is shutting down...
@@ -218,28 +218,18 @@ namespace Aika {
                         .OrderBy(x => x.UtcSampleTime);
 
             foreach (var val in valsToWrite) {
-                TagValue valueThisIteration;
-                if (stateSet == null) {
-                    valueThisIteration = val;
-                }
-                else {
-                    TagValue ssVal;
-
-                    if (!TagValue.TryCreateFromStateSet(stateSet, val, out ssVal)) {
-                        ++invalidSampleCount;
-                        continue;
-                    }
-
-                    valueThisIteration = ssVal;
+                if (!this.TryValidateIncomingTagValue(val, stateSet, out var validatedValue)) {
+                    ++invalidSampleCount;
+                    continue;
                 }
 
-                SnapshotValue = valueThisIteration;
+                SnapshotValue = validatedValue;
                 ++sampleCount;
                 if (!earliestSampleTime.HasValue) {
-                    earliestSampleTime = valueThisIteration.UtcSampleTime;
+                    earliestSampleTime = validatedValue.UtcSampleTime;
                 }
-                if (!latestSampleTime.HasValue || valueThisIteration.UtcSampleTime > latestSampleTime.Value) {
-                    latestSampleTime = valueThisIteration.UtcSampleTime;
+                if (!latestSampleTime.HasValue || validatedValue.UtcSampleTime > latestSampleTime.Value) {
+                    latestSampleTime = validatedValue.UtcSampleTime;
                 }
             }
 
@@ -248,6 +238,49 @@ namespace Aika {
                     ? new WriteTagValuesResult(false, 0, null, null, new[] { String.Format(CultureInfo.CurrentCulture, Resources.WriteTagValuesResult_InvalidValuesSpecified, invalidSampleCount) })
                     : new WriteTagValuesResult(false, 0, null, null, new[] { Resources.WriteTagValuesResult_NoValuesSpecified })
                 : new WriteTagValuesResult(true, sampleCount, earliestSampleTime, latestSampleTime, invalidSampleCount == 0 ? null : new[] { String.Format(CultureInfo.CurrentCulture, Resources.WriteTagValuesResult_InvalidValuesSpecified, invalidSampleCount) });
+        }
+
+
+        /// <summary>
+        /// Inserts values into the historian archive, optionally skipping value validation (e.g. if 
+        /// the insert is because of a value emitted from the compression filter).
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="values">The values to insert.</param>
+        /// <param name="validate">Flags if the values should be validated before sending to the archive.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will return the write result.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
+        private async Task<WriteTagValuesResult> InsertArchiveValuesInternal(ClaimsPrincipal identity, IEnumerable<TagValue> values, bool validate, CancellationToken cancellationToken) {
+            if (!values?.Any() ?? false) {
+                return new WriteTagValuesResult(false, 0, null, null, new[] { Resources.WriteTagValuesResult_NoValuesSpecified });
+            }
+
+            var stateSet = await GetStateSet(identity, cancellationToken).ConfigureAwait(false);
+
+            if (validate) {
+                var vals = new List<TagValue>();
+                foreach (var value in values) {
+                    if (validate) {
+                        if (!this.TryValidateIncomingTagValue(value, stateSet, out var validatedValue)) {
+                            continue;
+                        }
+
+                        vals.Add(validatedValue);
+                    }
+                }
+
+                values = vals.ToArray();
+            }
+
+            try {
+                return await OnInsertArchiveValues(values, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception e) {
+                return new WriteTagValuesResult(false, 0, null, null, new[] { e.Message });
+            }
         }
 
 
@@ -261,28 +294,8 @@ namespace Aika {
         /// A task that will return the write result.
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
-        public async Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
-            var stateSet = await GetStateSet(identity, cancellationToken).ConfigureAwait(false);
-
-            if (stateSet != null) {
-                var vals = new List<TagValue>();
-                foreach (var value in values) {
-                    if (!TagValue.TryCreateFromStateSet(stateSet, value, out var val)) {
-                        continue;
-                    }
-
-                    vals.Add(val);
-                }
-
-                values = vals.ToArray();
-            }
-
-            try {
-                return await OnInsertArchiveValues(values, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception e) {
-                return new WriteTagValuesResult(false, 0, null, null, new[] { e.Message });
-            }
+        public Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
+            return InsertArchiveValuesInternal(identity, values, true, cancellationToken);
         }
 
 

@@ -117,65 +117,7 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Error_AtLeastOneStateIsRequired" xml:space="preserve">
-    <value>You must specify at least one state.</value>
-  </data>
-  <data name="Error_AtLeastOneTagNameRequired" xml:space="preserve">
-    <value>You must specify at least one tag name.</value>
-  </data>
-  <data name="Error_CompressionFilter_LastArchivedValueCannotBeNewerThanLastReceivedValue" xml:space="preserve">
-    <value>Last-archived value cannot be more recent than last-received value.</value>
-  </data>
-  <data name="Error_DataFunctionNameIsRequired" xml:space="preserve">
-    <value>You must specify a data function name.</value>
-  </data>
-  <data name="Error_HistorianNotRunning" xml:space="preserve">
-    <value>The historian is not running.  Call the {0} method.</value>
-    <comment>{0} - Init method name</comment>
-  </data>
-  <data name="Error_HistorianStillInitializing" xml:space="preserve">
-    <value>The historian is still initializing.</value>
-  </data>
-  <data name="Error_PositivePointCountIsRequired" xml:space="preserve">
-    <value>You must specify a point count greater than zero.</value>
-  </data>
-  <data name="Error_SampleIntervalMustBeGreaterThanZero" xml:space="preserve">
-    <value>You must specify a positive sample interval.</value>
-  </data>
-  <data name="Error_StartTimeCannotBeLaterThanEndTime" xml:space="preserve">
-    <value>Start time cannot be greater than end time.</value>
-  </data>
-  <data name="Error_StateSetAlreadyExists" xml:space="preserve">
-    <value>The specified state set already exists.</value>
-  </data>
-  <data name="Error_StateSetDoesNotExist" xml:space="preserve">
-    <value>The specified state set does not exist.</value>
-  </data>
   <data name="Error_StateSetNameIsRequired" xml:space="preserve">
-    <value>You must specify a state set name.</value>
-  </data>
-  <data name="Error_TagIdIsRequired" xml:space="preserve">
-    <value>You must specify a tag ID.</value>
-  </data>
-  <data name="Error_TagIdOrNameIsRequired" xml:space="preserve">
-    <value>You must specify a tag ID or name.</value>
-  </data>
-  <data name="Error_TagStateSetIsRequired" xml:space="preserve">
-    <value>The tag's state set is required.</value>
-  </data>
-  <data name="Error_UnsupportedDataFunction" xml:space="preserve">
-    <value>Unsupported data function.</value>
-  </data>
-  <data name="TagValue_Unauthorized" xml:space="preserve">
-    <value>Unauthorized</value>
-  </data>
-  <data name="WriteTagValuesResult_InvalidValuesSpecified" xml:space="preserve">
-    <value>{0} invalid values were specified.</value>
-  </data>
-  <data name="WriteTagValuesResult_NoValuesSpecified" xml:space="preserve">
-    <value>No values specified.</value>
-  </data>
-  <data name="WriteTagValuesResult_Unauthorized" xml:space="preserve">
-    <value>Unauthorized</value>
+    <value>State set name is required.</value>
   </data>
 </root>

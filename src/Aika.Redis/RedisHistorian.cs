@@ -540,20 +540,19 @@ namespace Aika.Redis {
         /// Creates a new state set.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="name">The name of the new state set.</param>
-        /// <param name="states">The states for the set.</param>
+        /// <param name="settings">The state set settings.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A new <see cref="StateSet"/>.
         /// </returns>
-        public override async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
-            if (name  == null) {
-                throw new ArgumentNullException(nameof(name));
+        public override async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
+            if (settings  == null) {
+                throw new ArgumentNullException(nameof(settings));
             }
 
-            var stateSet = new StateSet(name, states);
-            if (!_stateSets.TryAdd(name, stateSet)) {
-                throw new ArgumentException(Resources.Error_StateSetAlreadyExists, nameof(name));
+            var stateSet = new StateSet(settings.Name, settings.Description, settings.States);
+            if (!_stateSets.TryAdd(settings.Name, stateSet)) {
+                throw new ArgumentException(Resources.Error_StateSetAlreadyExists, nameof(settings));
             }
                                                   
             await RedisStateSet.Save(this, stateSet, true, cancellationToken).ConfigureAwait(false);
@@ -566,17 +565,20 @@ namespace Aika.Redis {
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="name">The name of the state set.</param>
-        /// <param name="states">The updated states for the set.</param>
+        /// <param name="settings">The state set settings.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// The updated <see cref="StateSet"/>.
         /// </returns>
-        public override async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
+        public override async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
             if (name == null) {
                 throw new ArgumentNullException(nameof(name));
             }
+            if (settings == null) {
+                throw new ArgumentNullException(nameof(settings));
+            }
 
-            var stateSet = new StateSet(name, states);
+            var stateSet = new StateSet(name, settings.Description, settings.States);
             if (!_stateSets.ContainsKey(name)) {
                 throw new ArgumentException(Resources.Error_StateSetDoesNotExist, nameof(name));
             }

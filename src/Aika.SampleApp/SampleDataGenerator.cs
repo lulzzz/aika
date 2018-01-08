@@ -110,18 +110,28 @@ namespace Aika.SampleApp {
             var identity = GetSystemIdentity();
             var start = DateTime.UtcNow.AddDays(-1);
 
-            var tags = await _historian.GetTags(identity, new[] { "Sinusoid" }, cancellationToken).ConfigureAwait(false);
-            var tag = tags.FirstOrDefault();
+            var runningStateSet = await _historian.GetStateSet(identity, "Running_States", cancellationToken).ConfigureAwait(false);
+            if (runningStateSet == null) {
+                var settings = new StateSetSettings() {
+                    Name = "Running_States",
+                    Description = "State set for Aika running state tag",
+                    States = new[] { new StateSetItem("Running", 1), new StateSetItem("Stopped", 0) }
+                };
+                runningStateSet = await _historian.CreateStateSet(identity, settings, cancellationToken).ConfigureAwait(false);
+            }
+            var runningStateStopped = runningStateSet["Stopped"];
+            var runningStateRunning = runningStateSet["Running"];
 
-            var wavePeriod = TimeSpan.FromHours(12).Ticks;
-            const int waveAmplitude = 50;
+            var tags = await _historian.GetTags(identity, new[] { "Sinusoid", "Running_State" }, cancellationToken).ConfigureAwait(false);
 
-            double waveFunc(double time, double period, double amplitude) {
-                return amplitude * (Math.Sin(2 * Math.PI * (1 / period) * (time % period)));
+            double sinusoidWaveFunc(double time) {
+                double period = TimeSpan.FromHours(12).Ticks;
+                return 50f * (Math.Sin(2 * Math.PI * (1 / period) * (time % period)));
             };
 
-            if (tag == null) {
-                tag = await _historian.CreateTag(identity,
+            var sinusoid = tags.FirstOrDefault(x => x.Name.Equals("Sinusoid", StringComparison.OrdinalIgnoreCase));
+            if (sinusoid == null) {
+                sinusoid = await _historian.CreateTag(identity,
                                                 new TagSettings() {
                                                     Name = "Sinusoid",
                                                     Description = $"12 hour sinusoid wave (starting at {start:dd-MMM-yy HH:mm:ss} UTC), with exception and compression filtering",
@@ -141,58 +151,106 @@ namespace Aika.SampleApp {
                                                 },
                                                 cancellationToken).ConfigureAwait(false);
             }
-            else if (tag.SnapshotValue != null) {
-                start = tag.SnapshotValue.UtcSampleTime.Add(TimeSpan.FromMinutes(0.5));
+            else if (sinusoid.SnapshotValue != null) {
+                start = sinusoid.SnapshotValue.UtcSampleTime.Add(TimeSpan.FromMinutes(0.5));
+            }
+
+            var runningState = tags.FirstOrDefault(x => x.Name.Equals("Running_State", StringComparison.OrdinalIgnoreCase));
+            if (runningState == null) {
+                runningState = await _historian.CreateTag(identity,
+                                                new TagSettings() {
+                                                    Name = "Running_State",
+                                                    Description = "Describes the running state of the Aika historian.",
+                                                    DataType = TagDataType.State,
+                                                    StateSet = runningStateSet.Name,
+                                                    ExceptionFilterSettings = new TagValueFilterSettingsUpdate() {
+                                                        IsEnabled = true,
+                                                        LimitType = TagValueFilterDeviationType.Absolute,
+                                                        Limit = 1,
+                                                        WindowSize = TimeSpan.FromDays(1)
+                                                    },
+                                                    CompressionFilterSettings = new TagValueFilterSettingsUpdate() {
+                                                        IsEnabled = false,
+                                                    }
+                                                },
+                                                cancellationToken).ConfigureAwait(false);
             }
 
             if (start <= DateTime.UtcNow) {
-                var samples = new List<TagValue>();
+                var sinusoidSamples = new List<TagValue>();
 
                 for (var sampleTime = start; sampleTime <= DateTime.UtcNow; sampleTime = sampleTime.Add(TimeSpan.FromMinutes(0.5))) {
-                    var value = waveFunc(sampleTime.Ticks, wavePeriod, waveAmplitude);
-                    samples.Add(new TagValue(sampleTime, value, null, TagValueQuality.Good, null));
+                    var sinusoidValue = sinusoidWaveFunc(sampleTime.Ticks);
+                    sinusoidSamples.Add(new TagValue(sampleTime, sinusoidValue, null, TagValueQuality.Good, null));
 
-                    if (samples.Count >= 5000) {
+                    if (sinusoidSamples.Count >= 5000) {
                         await _historian.WriteTagData(identity,
                                             new Dictionary<string, IEnumerable<TagValue>>() {
-                                                 { tag.Name, samples.ToArray() }
+                                                 { sinusoid.Name, sinusoidSamples.ToArray() },
                                             },
                                             cancellationToken).ConfigureAwait(false);
 
-                        samples.Clear();
+                        sinusoidSamples.Clear();
                     }
                 }
 
-                if (samples.Count > 0) {
+                if (sinusoidSamples.Count > 0) {
                     await _historian.WriteTagData(identity,
                                                  new Dictionary<string, IEnumerable<TagValue>>() {
-                                                 { tag.Name, samples }
+                                                    { sinusoid.Name, sinusoidSamples.ToArray() },
                                                  },
                                                  cancellationToken).ConfigureAwait(false);
                 }
+
+                await _historian.WriteTagData(identity,
+                                                 new Dictionary<string, IEnumerable<TagValue>>() {
+                                                    {
+                                                         runningState.Name,
+                                                         new [] {
+                                                             new TagValue(runningState.SnapshotValue?.UtcSampleTime.AddSeconds(1) ?? DateTime.UtcNow.AddSeconds(-1), runningStateStopped.Value, runningStateStopped.Name, TagValueQuality.Good, null),
+                                                             new TagValue(DateTime.UtcNow, runningStateRunning.Value, runningStateRunning.Name, TagValueQuality.Good, null)
+                                                         }
+                                                     }
+                                                 },
+                                                 cancellationToken).ConfigureAwait(false);
             }
 
-            do {
-                // Every 30 seconds, we'll generate a new sample to write to the tag.
-                await Task.Delay(TimeSpan.FromMinutes(0.5), cancellationToken).ConfigureAwait(false);
-                if (cancellationToken.IsCancellationRequested) {
-                    break;
+            try {
+                do {
+                    // Every 30 seconds, we'll generate new samples to write to the tags.
+                    await Task.Delay(TimeSpan.FromMinutes(0.5), cancellationToken).ConfigureAwait(false);
+                    if (cancellationToken.IsCancellationRequested) {
+                        break;
+                    }
+
+                    var sampleTime = DateTime.UtcNow;
+                    var sinusoidValue = sinusoidWaveFunc(sampleTime.Ticks);
+                    var sinusoidSnapshot = new TagValue(sampleTime, sinusoidValue, null, TagValueQuality.Good, null);
+                    var runningStateSnapshot = new TagValue(sampleTime, runningStateRunning.Value, runningStateRunning.Name, TagValueQuality.Good, null);
+
+                    // Use the task runner to perform the actual write, so that we can approximately 
+                    // keep to our 30 second schedule.
+                    _taskRunner.RunBackgroundTask(ct =>
+                        _historian.WriteTagData(identity,
+                                                new Dictionary<string, IEnumerable<TagValue>>() {
+                                                    { sinusoid.Name, new[] { sinusoidSnapshot } },
+                                                    { runningState.Name, new[] { runningStateSnapshot } },
+                                                },
+                                                ct));
                 }
-
-                var sampleTime = DateTime.UtcNow;
-                var value = waveFunc(sampleTime.Ticks, wavePeriod, waveAmplitude);
-                var snapshot = new TagValue(sampleTime, value, null, TagValueQuality.Good, null);
-
-                // Use the task runner to perform the actual write, so that we can approximately 
-                // keep to our 30 second schedule.
-                _taskRunner.RunBackgroundTask(ct => 
-                    _historian.WriteTagData(identity,
-                                            new Dictionary<string, IEnumerable<TagValue>>() {
-                                                { tag.Name, new[] { snapshot } },
-                                            },
-                                            ct));
+                while (!cancellationToken.IsCancellationRequested);
             }
-            while (!cancellationToken.IsCancellationRequested);
+            catch (OperationCanceledException) {
+                using (var ctSource = new CancellationTokenSource(TimeSpan.FromSeconds(5))) {
+                    await _historian.WriteTagData(identity,
+                                                    new Dictionary<string, IEnumerable<TagValue>>() {
+                                                        { runningState.Name, new[] { new TagValue(DateTime.UtcNow, runningStateStopped.Value, runningStateStopped.Name, TagValueQuality.Good, null) } },
+                                                    },
+                                                    ctSource.Token).ConfigureAwait(false);
+                }
+            }
         }
+
     }
+
 }

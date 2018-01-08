@@ -72,13 +72,12 @@ namespace Aika {
         /// Creates a new state set.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="name">The name of the new state set.</param>
-        /// <param name="states">The states for the set.</param>
+        /// <param name="settings">The state set settings.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A new <see cref="StateSet"/>.
         /// </returns>
-        Task<StateSet> CreateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken);
+        Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -86,12 +85,12 @@ namespace Aika {
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="name">The name of the state set.</param>
-        /// <param name="states">The updated states for the set.</param>
+        /// <param name="settings">The state set settings.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// The updated <see cref="StateSet"/>.
         /// </returns>
-        Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken);
+        Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken);
 
 
         /// <summary>

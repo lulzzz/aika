@@ -238,9 +238,12 @@ namespace Aika.Client.Clients {
             if (stateSet == null) {
                 throw new ArgumentNullException(nameof(stateSet));
             }
+            if (String.IsNullOrWhiteSpace(stateSet.Name)) {
+                throw new ArgumentException(Resources.Error_StateSetNameIsRequired, nameof(stateSet));
+            }
 
-            const string url = "api/configuration/statesets";
-            var response = await _client.PutAsJsonAsync(url, stateSet, cancellationToken).ConfigureAwait(false);
+            var url = $"api/configuration/statesets/{Uri.EscapeDataString(stateSet?.Name)}";
+            var response = await _client.PutAsJsonAsync(url, new StateSetDto() { Description = stateSet.Description, States = stateSet.States }, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             return await response.Content.ReadAsJsonAsync<StateSetDto>(cancellationToken).ConfigureAwait(false);

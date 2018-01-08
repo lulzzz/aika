@@ -66,13 +66,22 @@ namespace Aika.Redis {
             var values = await historian.Connection.GetDatabase().HashGetAllAsync(historian.GetKeyForStateSetDefinition(name)).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
+            string description = null;
             var states = new List<StateSetItem>();
 
             foreach (var item in values) {
-                states.Add(new StateSetItem(item.Name, (int) item.Value));
+                if (item.Name == "DESC") {
+                    description = item.Value;
+                    continue;
+                }
+
+                var hName = item.Name.ToString();
+                if (hName.StartsWith("S_")) {
+                    states.Add(new StateSetItem(hName.Substring(2), (int) item.Value));
+                }
             }
 
-            return new StateSet(name, states);
+            return new StateSet(name, description, states);
         }
 
 
@@ -95,7 +104,12 @@ namespace Aika.Redis {
             var tasks = new List<Task>();
             var db = historian.Connection.GetDatabase();
 
-            tasks.Add(db.HashSetAsync(key, stateSet.Select(x => new HashEntry(x.Name, x.Value)).ToArray()));
+            var hashes = new List<HashEntry>() {
+                new HashEntry("DESC", stateSet.Description)
+            };
+            hashes.AddRange(stateSet.Select(x => new HashEntry($"S_{x.Name}", x.Value)));
+
+            tasks.Add(db.HashSetAsync(key, hashes.ToArray()));
             if (addToMasterList) {
                 var listKey = historian.GetKeyForStateSetNamesList();
                 tasks.Add(db.ListRightPushAsync(listKey, stateSet.Name));

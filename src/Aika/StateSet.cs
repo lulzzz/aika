@@ -22,6 +22,11 @@ namespace Aika {
         public string Name { get; }
 
         /// <summary>
+        /// Gets the state set description.
+        /// </summary>
+        public string Description { get; }
+
+        /// <summary>
         /// Gets the state with the specified name.
         /// </summary>
         /// <param name="name">The state name.</param>
@@ -59,12 +64,14 @@ namespace Aika {
         /// Creates a new <see cref="StateSet"/> object.
         /// </summary>
         /// <param name="name">The state set name.</param>
+        /// <param name="description">The state set description.</param>
         /// <exception cref="ArgumentException"><paramref name="name"/> is <see langword="null"/> or white space.</exception>
-        public StateSet(string name) {
+        private StateSet(string name, string description) {
             if (String.IsNullOrWhiteSpace(name)) {
                 throw new ArgumentException(Resources.Error_StateSetNameIsRequired, nameof(name));
             }
             Name = name.Trim();
+            Description = description?.Trim();
         }
 
 
@@ -72,9 +79,10 @@ namespace Aika {
         /// Creates a new <see cref="StateSet"/> object using the specified state definitions.
         /// </summary>
         /// <param name="name">The state set name.</param>
+        /// <param name="description">The state set description.</param>
         /// <param name="states">The state definitions to add.</param>
         /// <exception cref="ArgumentException"><paramref name="name"/> is <see langword="null"/> or white space.</exception>
-        public StateSet(string name, IEnumerable<StateSetItem> states) : this(name) {
+        public StateSet(string name, string description, IEnumerable<StateSetItem> states) : this(name, description) {
             if (states != null) {
                 foreach (var item in states) {
                     Add(item);

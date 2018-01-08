@@ -14,10 +14,18 @@ namespace Aika.Client.Dto {
         /// <summary>
         /// Gets or sets the name of the set.
         /// </summary>
-        [Required]
-        [MinLength(1)]
+        /// <remarks>
+        /// No <see cref="RequiredAttribute"/> or <see cref="MinLengthAttribute"/> is specified, because 
+        /// it is acceptable to not specify a name when updating an existing state set.
+        /// </remarks>
         [MaxLength(50)]
         public string Name { get; set; }
+
+        /// <summary>
+        /// Gets or sets the description for the set.
+        /// </summary>
+        [MaxLength(100)]
+        public string Description { get; set; }
 
         /// <summary>
         /// Gets or sets the states.

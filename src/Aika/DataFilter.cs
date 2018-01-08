@@ -351,8 +351,14 @@ namespace Aika {
                     return false;
                 }
 
+                if (Filter.ExceptionFilter.LastReceivedValue == null) {
+                    reason = "A last-received value has not been set on the exception monitor.";
+                    limits = null;
+                    return true;
+                }
+
                 if (!Filter.IsEnabled) {
-                    reason = "The data compression buffer is disabled.";
+                    reason = "The data filter is disabled.";
                     limits = null;
                     return true;
                 }
@@ -610,7 +616,7 @@ namespace Aika {
             /// </returns>
             private bool PassesCompressionFilter(TagValue incoming, out string reason, out CalculatedLimits interpolatedCompressionLimits) {
                 if (!Filter.IsEnabled) {
-                    reason = "The data compression buffer is disabled.";
+                    reason = "The data filter is disabled.";
                     interpolatedCompressionLimits = null;
                     return true;
                 }

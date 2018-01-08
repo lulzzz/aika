@@ -292,17 +292,17 @@ namespace Aika.Historians {
             return Task.FromResult<StateSet>(null);
         }
 
-        public override Task<StateSet> CreateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
-            var result = new StateSet(name, states);
+        public override Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
+            var result = new StateSet(settings.Name, settings.Description, settings.States);
             if (!_stateSets.TryAdd(result.Name, result)) {
-                throw new ArgumentException("A state set with the same name already exists.", nameof(name));
+                throw new ArgumentException("A state set with the same name already exists.", nameof(settings));
             }
 
             return Task.FromResult(result);
         }
 
-        public override Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, IEnumerable<StateSetItem> states, CancellationToken cancellationToken) {
-            var result = new StateSet(name, states);
+        public override Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
+            var result = new StateSet(name, settings.Description, settings.States);
             _stateSets[result.Name] = result;
 
             return Task.FromResult(result);
