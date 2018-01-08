@@ -29,9 +29,9 @@ namespace Aika {
         private readonly ConcurrentDictionary<string, TagDefinition> _subscribedTags = new ConcurrentDictionary<string, TagDefinition>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
-        /// Holds the handlers for the <see cref="TagDefinition.SnapshotValueUpdated"/> events on each subscribed tag.
+        /// Holds the subscriptions for each subscribed tag.
         /// </summary>
-        private readonly ConcurrentDictionary<string, Action<TagValue>> _valueReceivedHandlers = new ConcurrentDictionary<string, Action<TagValue>>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, IDisposable> _subscriptions = new ConcurrentDictionary<string, IDisposable>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Raised whenever the subscription receives new values.
@@ -93,13 +93,12 @@ namespace Aika {
                     });
                 };
 
-                _valueReceivedHandlers[item.Id] = onValueReceived;
+                _subscriptions[item.Id] = item.CreateSnapshotSubscription(onValueReceived);
 
                 if (item.SnapshotValue != null) {
                     onValueReceived.Invoke(item.SnapshotValue);
                 }
 
-                item.SnapshotValueUpdated += onValueReceived;
                 item.Deleted += UnsubscribeTag;
             }
         }
@@ -147,8 +146,8 @@ namespace Aika {
         /// <param name="tag">The tag.</param>
         private void UnsubscribeTag(TagDefinition tag) {
             _subscribedTags.TryRemove(tag.Id, out var _);
-            if (_valueReceivedHandlers.TryRemove(tag.Id, out var handler)) {
-                tag.SnapshotValueUpdated -= handler;
+            if (_subscriptions.TryRemove(tag.Id, out var subscription)) {
+                subscription.Dispose();
             }
         }
 

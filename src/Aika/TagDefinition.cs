@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
@@ -76,10 +77,6 @@ namespace Aika {
         /// </summary>
         public TagValue SnapshotValue {
             get { return _snapshotValue; }
-            private set {
-                _snapshotValue = value;
-                SnapshotValueUpdated?.Invoke(value);
-            }
         }
 
         /// <summary>
@@ -88,9 +85,28 @@ namespace Aika {
         public DataFilter DataFilter { get; }
 
         /// <summary>
-        /// Raised whenever the snapshot value of the tag changes.
+        /// Holds snapshot subscribers.
         /// </summary>
-        public event Action<TagValue> SnapshotValueUpdated;
+        private readonly ConcurrentDictionary<SnapshotValueSubscription, object> _snapshotSubscriptions = new ConcurrentDictionary<SnapshotValueSubscription, object>();
+
+        /// <summary>
+        /// Gets a flag that indicates if the tag currently has any snapshot subscribers.
+        /// </summary>
+        public bool HasSnapshotSupscriptions {
+            get { return _snapshotSubscriptions.Count > 0; }
+        }
+
+
+        /// <summary>
+        /// Raised whenever the snapshot value changes.
+        /// </summary>
+        protected event Action<TagValue> SnapshotValueUpdated;
+
+
+        /// <summary>
+        /// Raised whenever a snapshot subscription is added to or removed from the tag.
+        /// </summary>
+        public event Action<TagDefinition> SnapshotValueSubscriptionChange;
 
 
         /// <summary>
@@ -139,7 +155,7 @@ namespace Aika {
             UtcCreatedAt = utcCreatedAt ?? DateTime.UtcNow;
             UtcLastModifiedAt = utcLastModifiedAt ?? UtcCreatedAt;
 
-            SnapshotValue = snapshotValue;
+            _snapshotValue = snapshotValue;
             DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, SnapshotValue), new CompressionFilterState(compressionFilterSettings, lastArchivedValue, SnapshotValue), _historian.LoggerFactory);
             DataFilter.Archive += values => {
                 if (_logger.IsEnabled(LogLevel.Trace)) {
@@ -158,8 +174,6 @@ namespace Aika {
                     }
                 });
             };
-
-            SnapshotValueUpdated += val => DataFilter.ValueReceived(val);
         }
 
 
@@ -174,6 +188,14 @@ namespace Aika {
         }
 
 
+        /// <summary>
+        /// Gets the state set object for the tag.
+        /// </summary>
+        /// <param name="identity">The identity of the calling user.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will return the state set object.
+        /// </returns>
         private async Task<StateSet> GetStateSet(ClaimsPrincipal identity, CancellationToken cancellationToken) {
             if (DataType != TagDataType.State) {
                 return null;
@@ -184,6 +206,18 @@ namespace Aika {
             }
 
             return await _historian.GetStateSet(identity, StateSet, cancellationToken).ConfigureAwait(false);
+        }
+
+
+        /// <summary>
+        /// Creates a new snapshot value subscription.
+        /// </summary>
+        /// <param name="callback">The callback function to invoke when the value changes.</param>
+        /// <returns>
+        /// An <see cref="IDisposable"/> that represents the subscription.  Dispose the object to unsubscribe.
+        /// </returns>
+        internal IDisposable CreateSnapshotSubscription(Action<TagValue> callback) {
+            return new SnapshotValueSubscription(this, callback);
         }
 
 
@@ -223,7 +257,7 @@ namespace Aika {
                     continue;
                 }
 
-                SnapshotValue = validatedValue;
+                UpdateSnapshotValue(validatedValue);
                 ++sampleCount;
                 if (!earliestSampleTime.HasValue) {
                     earliestSampleTime = validatedValue.UtcSampleTime;
@@ -311,6 +345,27 @@ namespace Aika {
 
 
         /// <summary>
+        /// Updates the snapshot value for the tag.  You do not need to call this method from your 
+        /// implementation unless you have disabled writing of new tag values from Aika (e.g. if 
+        /// you are integrating with an existing historian and do not want to allow writes via Aika).
+        /// </summary>
+        /// <param name="value">The updated value.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
+        protected void UpdateSnapshotValue(TagValue value) {
+            _snapshotValue = value ?? throw new ArgumentNullException(nameof(value));
+            DataFilter.ValueReceived(value);
+            SnapshotValueUpdated?.Invoke(value);
+            foreach (var subscriber in _snapshotSubscriptions.Keys) {
+                try {
+                    subscriber.OnValueChange(value);
+                }
+                catch (Exception e) {
+                    _logger?.LogError("An error occurred while notifying a snapshot subscriber of a change.", e);
+                }
+            }
+        }
+
+        /// <summary>
         /// Creates a new tag identifier.
         /// </summary>
         /// <returns>A unique identifier for a tag.</returns>
@@ -358,6 +413,57 @@ namespace Aika {
         /// </summary>
         protected void OnDeleted() {
             Deleted?.Invoke(this);
+        }
+
+
+        /// <summary>
+        /// Describes a snapshot subscriber on a tag.
+        /// </summary>
+        private class SnapshotValueSubscription : IDisposable {
+
+            /// <summary>
+            /// The tag that the subscription is for.
+            /// </summary>
+            private readonly TagDefinition _tag;
+
+            /// <summary>
+            /// The delegate to invoke when the snapshot value of the tag changes.
+            /// </summary>
+            private readonly Action<TagValue> _onValueChange;
+
+
+            /// <summary>
+            /// Creates a new <see cref="SnapshotValueSubscription"/> object.
+            /// </summary>
+            /// <param name="tag">The tag.</param>
+            /// <param name="onValueChange">The value change callback.</param>
+            internal SnapshotValueSubscription(TagDefinition tag, Action<TagValue> onValueChange) {
+                _tag = tag ?? throw new ArgumentNullException(nameof(tag));
+                _onValueChange = onValueChange ?? throw new ArgumentNullException(nameof(onValueChange));
+
+                _tag._snapshotSubscriptions[this] = new object();
+                _tag.SnapshotValueSubscriptionChange?.Invoke(_tag);
+            }
+
+
+            /// <summary>
+            /// Sends a value change to the subscriber.
+            /// </summary>
+            /// <param name="value">The new value.</param>
+            internal void OnValueChange(TagValue value) {
+                _onValueChange?.Invoke(value);
+            }
+
+
+            /// <summary>
+            /// Disposes of the subscription.
+            /// </summary>
+            public void Dispose() {
+                if (_tag._snapshotSubscriptions.TryRemove(this, out var removed)) {
+                    _tag.SnapshotValueSubscriptionChange?.Invoke(_tag);
+                }
+            }
+
         }
 
     }
