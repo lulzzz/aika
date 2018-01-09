@@ -63,5 +63,16 @@ namespace Aika {
             return new WriteTagValuesResult(false, 0, null, null, new[] { Resources.WriteTagValuesResult_Unauthorized });
         }
 
+
+        /// <summary>
+        /// Creates a <see cref="WriteTagValuesResult"/> that represents an attempt to write an empty set of values.
+        /// </summary>
+        /// <returns>
+        /// A new <see cref="WriteTagValuesResult"/> object.
+        /// </returns>
+        public static WriteTagValuesResult CreateEmptyResult() {
+            return new WriteTagValuesResult(false, 0, null, null, new[] { Resources.WriteTagValuesResult_NoValuesSpecified }); ;
+        }
+
     }
 }

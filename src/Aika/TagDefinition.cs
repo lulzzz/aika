@@ -27,6 +27,11 @@ namespace Aika {
         private readonly HistorianBase _historian;
 
         /// <summary>
+        /// Ensures that only one archive insert can occur at a time.
+        /// </summary>
+        private readonly SemaphoreSlim _archiveLock = new SemaphoreSlim(1, 1);
+
+        /// <summary>
         /// Gets the unique identifier for the tag.
         /// </summary>
         public string Id { get; }
@@ -98,12 +103,6 @@ namespace Aika {
 
 
         /// <summary>
-        /// Raised whenever the snapshot value changes.
-        /// </summary>
-        protected event Action<TagValue> SnapshotValueUpdated;
-
-
-        /// <summary>
         /// Raised whenever a snapshot subscription is added to or removed from the tag.
         /// </summary>
         public event Action<TagDefinition> SnapshotValueSubscriptionChange;
@@ -129,12 +128,11 @@ namespace Aika {
         /// <param name="settings">The tag settings.</param>
         /// <param name="utcCreatedAt">The UTC creation time for the tag.</param>
         /// <param name="utcLastModifiedAt">The UTC last-modified time for the tag.</param>
-        /// <param name="snapshotValue">The tag's current snapshot value.  Can be <see langword="null"/>.</param>
-        /// <param name="lastArchivedValue">The tag's last-archived value.  Can be <see langword="null"/>.</param>
+        /// <param name="initialTagValues">The initial values to configure the tag's exception and compression filters with.</param>
         /// <exception cref="ArgumentNullException"><paramref name="historian"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
         /// <exception cref="ValidationException"><paramref name="settings"/> is not valid.</exception>
-        protected TagDefinition(HistorianBase historian, string id, TagSettings settings, DateTime? utcCreatedAt, DateTime? utcLastModifiedAt, TagValue snapshotValue, TagValue lastArchivedValue) {
+        protected TagDefinition(HistorianBase historian, string id, TagSettings settings, DateTime? utcCreatedAt, DateTime? utcLastModifiedAt, InitialTagValues initialTagValues) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _logger = _historian.LoggerFactory?.CreateLogger<TagDefinition>();
 
@@ -155,22 +153,26 @@ namespace Aika {
             UtcCreatedAt = utcCreatedAt ?? DateTime.UtcNow;
             UtcLastModifiedAt = utcLastModifiedAt ?? UtcCreatedAt;
 
-            _snapshotValue = snapshotValue;
-            DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, SnapshotValue), new CompressionFilterState(compressionFilterSettings, lastArchivedValue, SnapshotValue), _historian.LoggerFactory);
-            DataFilter.Archive += values => {
-                if (_logger.IsEnabled(LogLevel.Trace)) {
+            _snapshotValue = initialTagValues?.SnapshotValue;
+            DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, _snapshotValue), new CompressionFilterState(compressionFilterSettings, initialTagValues?.LastArchivedValue, initialTagValues?.NextArchiveCandidateValue), _historian.LoggerFactory);
+            DataFilter.Emit += (values, nextArchiveCandidate) => {
+                if (values.Length > 0 && _logger.IsEnabled(LogLevel.Trace)) {
                     _logger.LogTrace($"[{Name}] Archiving {values.Count()} values emitted by the compression filter.");
                 }
 
                 _historian.TaskRunner.RunBackgroundTask(async ct => {
+                    await _archiveLock.WaitAsync(ct).ConfigureAwait(false);
                     try {
-                        await InsertArchiveValuesInternal(ClaimsPrincipal.Current, values.ToArray(), false, ct).ConfigureAwait(false);
+                        await InsertArchiveValuesInternal(ClaimsPrincipal.Current, values, nextArchiveCandidate, false, ct).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) {
                         // App is shutting down...
                     }
                     catch (Exception e) {
                         _logger?.LogError($"[{Name}] An error occurred while archiving values emitted by the compression filter.", e);
+                    }
+                    finally {
+                        _archiveLock.Release();
                     }
                 });
             };
@@ -281,15 +283,17 @@ namespace Aika {
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="values">The values to insert.</param>
+        /// <param name="nextArchiveCandidate">The current candidate for the next value to be inserted.</param>
         /// <param name="validate">Flags if the values should be validated before sending to the archive.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A task that will return the write result.
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
-        private async Task<WriteTagValuesResult> InsertArchiveValuesInternal(ClaimsPrincipal identity, IEnumerable<TagValue> values, bool validate, CancellationToken cancellationToken) {
+        private async Task<WriteTagValuesResult> InsertArchiveValuesInternal(ClaimsPrincipal identity, IEnumerable<TagValue> values, TagValue nextArchiveCandidate, bool validate, CancellationToken cancellationToken) {
             if (!values?.Any() ?? false) {
-                return new WriteTagValuesResult(false, 0, null, null, new[] { Resources.WriteTagValuesResult_NoValuesSpecified });
+                await InsertArchiveValues(null, nextArchiveCandidate, cancellationToken).ConfigureAwait(false);
+                return WriteTagValuesResult.CreateEmptyResult();
             }
 
             var stateSet = await GetStateSet(identity, cancellationToken).ConfigureAwait(false);
@@ -310,7 +314,7 @@ namespace Aika {
             }
 
             try {
-                return await OnInsertArchiveValues(values, cancellationToken).ConfigureAwait(false);
+                return await InsertArchiveValues(values, nextArchiveCandidate, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception e) {
                 return new WriteTagValuesResult(false, 0, null, null, new[] { e.Message });
@@ -328,20 +332,38 @@ namespace Aika {
         /// A task that will return the write result.
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
-        public Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
-            return InsertArchiveValuesInternal(identity, values, true, cancellationToken);
+        public async Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
+            await _archiveLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try {
+                return await InsertArchiveValuesInternal(identity, values, DataFilter.CompressionFilter.LastReceivedValue, true, cancellationToken).ConfigureAwait(false);
+            }
+            finally {
+                _archiveLock.Release();
+            }
         }
+
+
+        /// <summary>
+        /// When implemented in a derived type, saves a new snapshot value to the back-end historian.
+        /// </summary>
+        /// <param name="value">The new snapshot value for the tag.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will save the new snapshot value.
+        /// </returns>
+        protected abstract Task SaveSnapshotValue(TagValue value, CancellationToken cancellationToken);
 
 
         /// <summary>
         /// When implemented in a derived class, inserts values into the historian archive.
         /// </summary>
-        /// <param name="values">The values to insert.</param>
+        /// <param name="values">The values to insert.  Can be <see langword="null"/> or empty if only the <paramref name="nextArchiveCandidate"/> is being updated.</param>
+        /// <param name="nextArchiveCandidate">The candidate for the next value to write to the archive.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// The result of the insert.
         /// </returns>
-        protected abstract Task<WriteTagValuesResult> OnInsertArchiveValues(IEnumerable<TagValue> values, CancellationToken cancellationToken);
+        protected abstract Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, TagValue nextArchiveCandidate, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -354,7 +376,7 @@ namespace Aika {
         protected void UpdateSnapshotValue(TagValue value) {
             _snapshotValue = value ?? throw new ArgumentNullException(nameof(value));
             DataFilter.ValueReceived(value);
-            SnapshotValueUpdated?.Invoke(value);
+            _historian.TaskRunner.RunBackgroundTask(ct => SaveSnapshotValue(value, ct));
             foreach (var subscriber in _snapshotSubscriptions.Keys) {
                 try {
                     subscriber.OnValueChange(value);
@@ -467,4 +489,5 @@ namespace Aika {
         }
 
     }
+
 }

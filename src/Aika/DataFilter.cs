@@ -38,7 +38,7 @@ namespace Aika {
     /// 
     /// <para>
     /// To receive notifications when the compression filter determines that values should be archived, 
-    /// subscribe to the <see cref="Archive"/> event.
+    /// subscribe to the <see cref="Emit"/> event.
     /// </para>
     /// 
     /// <para>
@@ -144,7 +144,7 @@ namespace Aika {
 
         /// <summary>
         /// Gets the compression filter settings for the buffer.  The compression filter is used to determine 
-        /// if a new value should be sent for archiving (via the <see cref="Archive"/> event).
+        /// if a new value should be sent for archiving (via the <see cref="Emit"/> event).
         /// </summary>
         public CompressionFilterState CompressionFilter { get; }
 
@@ -158,22 +158,10 @@ namespace Aika {
         public event Action Disposed;
 
         /// <summary>
-        /// Raised whenever the <see cref="DataFilter"/> receives a value that passes the 
-        /// compression filter tests.  The values passed to event handlers will be values
-        /// that should be written to a data archive.
+        /// Raised whenever the <see cref="DataFilter"/> emits values that must be archived and/or a 
+        /// change in the next archive value candidate.
         /// </summary>
-        /// <remarks>
-        /// 
-        /// <para>
-        /// Note also that, when the <see cref="Archive"/> event is raised, the 
-        /// values emitted will be the two most-recently-received values *prior* to the value that 
-        /// passed the compression filter.  The value that actually passed the filter might not ever 
-        /// be sent for archiving itself, depending on the shape of the data that follows the 
-        /// exceptional value.
-        /// </para>
-        /// 
-        /// </remarks>
-        public event Action<IEnumerable<TagValue>> Archive;
+        public event CompressionFilterOutputDelegate Emit;
 
         #endregion
 
@@ -233,25 +221,23 @@ namespace Aika {
 
 
         /// <summary>
-        /// Invokes the <see cref="Archive"/> event using the provided values.
+        /// Invokes the <see cref="Emit"/> event using the provided values.
         /// </summary>
-        /// <param name="values">The values to send on for archiving.</param>
-        private void OnCompressionFilterPassed(IEnumerable<TagValue> values) {
-            var vals = values?.ToArray();
-            if (vals == null || vals.Length == 0) {
-                return;
-            }
+        /// <param name="valuesToArchive">The values to send on for archiving.</param>
+        /// <param name="nextArchiveCandidate">The updated next-archive candidate.</param>
+        private void OnCompressionFilterEmit(IEnumerable<TagValue> valuesToArchive, TagValue nextArchiveCandidate) {
+            var vals = valuesToArchive?.ToArray() ?? new TagValue[0];
 
             try {
-                if (Archive != null) {
-                    if (CanLogDebug) {
+                if (Emit != null) {
+                    if (vals.Length > 0 && CanLogDebug) {
                         Log?.LogDebug($"[{Name}] New values will be sent to subscribers for archiving: [ {String.Join(", ", vals.Select(x => $"{GetSampleValueForDisplay(x)} @ {x.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fffZ}"))} ]");
                     }
-                    Archive.Invoke(vals);
+                    Emit.Invoke(vals, nextArchiveCandidate);
                 }
             }
             catch (Exception e) {
-                Log?.LogError($"[{Name}] An unhandled exception occurred while invoking {nameof(Archive)} event handlers.", e);
+                Log?.LogError($"[{Name}] An unhandled exception occurred while invoking {nameof(Emit)} event handlers.", e);
             }
         }
 
@@ -269,7 +255,7 @@ namespace Aika {
         /// 
         /// <para>
         /// Incoming values that pass the exception filter will then be passed to the compression filter.  
-        /// If the values pass the compression filter, the <see cref="Archive"/> event will be raised, 
+        /// If the values pass the compression filter, the <see cref="Emit"/> event will be raised, 
         /// allowing subscribers to be notified about values that should be written to a data archive.
         /// </para>
         /// 
@@ -743,9 +729,9 @@ namespace Aika {
                         );
 
                         var valueToArchive = Filter.CompressionFilter.LastReceivedValue;
+
                         if (valueToArchive != null) {
                             Filter.CompressionFilter.LastArchivedValue = valueToArchive;
-                            Filter.OnCompressionFilterPassed(new[] { valueToArchive });
                         }
                         else {
                             if (Filter.CanLogDebug) {
@@ -761,6 +747,13 @@ namespace Aika {
                         Filter.CompressionFilter.LastReceivedValue = incoming.value;
                         CompressionMaximum = calculatedCompressionLimits.MaximumLimit;
                         CompressionMinimum = calculatedCompressionLimits.MinimumLimit;
+
+                        if (valueToArchive != null) {
+                            Filter.OnCompressionFilterEmit(new[] { valueToArchive }, incoming.value);
+                        }
+                        else {
+                            Filter.OnCompressionFilterEmit(null, incoming.value);
+                        }
 
                         return true;
                     }
@@ -809,6 +802,8 @@ namespace Aika {
                         Filter.CompressionFilter.LastReceivedValue = incoming.value;
                         CompressionMaximum = maxCompressionValueAtNewSnapshot;
                         CompressionMinimum = minCompressionValueAtNewSnapshot;
+
+                        Filter.OnCompressionFilterEmit(null, incoming.value);
 
                         return false;
                     }

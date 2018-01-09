@@ -75,6 +75,19 @@ namespace Aika.Redis {
 
 
         /// <summary>
+        /// Gets the Redis key for the tag's current archive candidate value.
+        /// </summary>
+        /// <param name="historian">The historian.</param>
+        /// <param name="tagId">The tag ID.</param>
+        /// <returns>
+        /// The Redis key for the tag's snapshot value.
+        /// </returns>
+        internal static string GetKeyForArchiveCandidateData(this RedisHistorian historian, string tagId) {
+            return $"{historian.GetKeyPrefixForTag(tagId)}:archiveCandidate";
+        }
+
+
+        /// <summary>
         /// Gets the Redis key prefix that is used for all things related to a state set.
         /// </summary>
         /// <param name="historian">The historian.</param>

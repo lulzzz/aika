@@ -42,7 +42,9 @@ namespace Aika.AspNetCore.Controllers {
         [HttpGet]
         [Route("")]
         [ProducesResponseType(200, Type = typeof(AikaInfoDto))]
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public async Task<IActionResult> GetInfo(CancellationToken cancellationToken) {
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
             var result = new AikaInfoDto() {
                 UtcStartupTime = _historian.UtcStartupTime,
                 Version = _historian.GetType().Assembly?.GetName().Version.ToString(),

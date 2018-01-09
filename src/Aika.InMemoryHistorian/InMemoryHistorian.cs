@@ -19,8 +19,9 @@ namespace Aika.Historians {
 
         private static readonly ConcurrentDictionary<string, StateSet> _stateSets = new ConcurrentDictionary<string, StateSet>(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly ConcurrentDictionary<string, RawDataSet> _rawData = new ConcurrentDictionary<string, RawDataSet>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, RawDataSet> _archive = new ConcurrentDictionary<string, RawDataSet>(StringComparer.OrdinalIgnoreCase);
 
+        private static readonly ConcurrentDictionary<string, TagValue> _archiveCandidates = new ConcurrentDictionary<string, TagValue>(StringComparer.OrdinalIgnoreCase);
 
         private const int MaxRawSampleCount = 5000;
 
@@ -128,7 +129,7 @@ namespace Aika.Historians {
 
             var tags = _tags.Values.Where(x => tagNames.Any(n => String.Equals(n, x.Id, StringComparison.OrdinalIgnoreCase) || String.Equals(n, x.Name, StringComparison.OrdinalIgnoreCase)));
             foreach (var tag in tags) {
-                if (!_rawData.TryGetValue(tag.Id, out var rawData)) {
+                if (!_archive.TryGetValue(tag.Id, out var rawData)) {
                     continue;
                 }
 
@@ -139,7 +140,17 @@ namespace Aika.Historians {
                             ? MaxRawSampleCount
                             : pointCount.Value
                         : MaxRawSampleCount;
-                    var selected = rawData.Values.Concat(tag.SnapshotValue == null ? new TagValue[0] : new[] { tag.SnapshotValue }).Where(x => x.UtcSampleTime >= utcStartTime && x.UtcSampleTime <= utcEndTime).Take(take);
+
+                    var nonArchiveValues = new List<TagValue>();
+                    if (_archiveCandidates.TryGetValue(tag.Id, out var candidate) && candidate != null) {
+                        nonArchiveValues.Add(candidate);
+                    }
+                    var snapshot = tag.SnapshotValue;
+                    if (snapshot != null) {
+                        nonArchiveValues.Add(snapshot);
+                    }
+
+                    var selected = rawData.Values.Concat(nonArchiveValues).Where(x => x.UtcSampleTime >= utcStartTime && x.UtcSampleTime <= utcEndTime).Take(take);
 
                     result[tag.Name] = new TagValueCollection() {
                         Values = selected.ToArray(),
@@ -171,7 +182,7 @@ namespace Aika.Historians {
 
 
         internal TagValue GetLastArchivedValue(string tagId) {
-            if (!_rawData.TryGetValue(tagId, out var rawData)) {
+            if (!_archive.TryGetValue(tagId, out var rawData)) {
                 return null;
             }
 
@@ -185,8 +196,18 @@ namespace Aika.Historians {
         }
 
 
+        internal void SaveSnapshotValue(string tagId, TagValue value) {
+            // Do nothing; this is held in the tag itself.
+        }
+
+
+        internal void SaveArchiveCandidateValue(string tagId, TagValue value) {
+            _archiveCandidates[tagId] = value;
+        }
+
+
         internal WriteTagValuesResult InsertArchiveValues(string tagId, IEnumerable<TagValue> values) {
-            var rawData = _rawData.GetOrAdd(tagId, x => new RawDataSet());
+            var rawData = _archive.GetOrAdd(tagId, x => new RawDataSet());
             var tag = _tags[tagId];
 
             rawData.Lock.EnterWriteLock();
@@ -257,16 +278,17 @@ namespace Aika.Historians {
 
 
         public override Task<bool> DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken) {
-            if (!_tags.TryGetValue(tagId, out var tag)) {
-                return Task.FromResult(false);
-            }
+            var result = false;
 
-            if (_tags.TryRemove(tag.Id, out var _)) {
+            if (_tags.TryRemove(tagId, out var tag)) {
                 tag.OnDeleted();
-                return Task.FromResult(true);
+                result = true;
+
+                _archive.TryRemove(tag.Id, out var rawData);
+                _archiveCandidates.TryRemove(tag.Id, out var candidate);
             }
 
-            return Task.FromResult(false);
+            return Task.FromResult(result);
         }
 
         public override Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {

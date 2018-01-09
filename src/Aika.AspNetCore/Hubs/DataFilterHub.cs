@@ -155,6 +155,7 @@ namespace Aika.AspNetCore.Hubs {
         }
 
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         /// <summary>
         /// Unsubscribes the caller from the specified tag names.
         /// </summary>
@@ -163,6 +164,7 @@ namespace Aika.AspNetCore.Hubs {
         /// A task that will process the request.
         /// </returns>
         public async Task Unsubscribe(IEnumerable<string> tagNames) {
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
             var subscriptions = _subscriptions[Context.ConnectionId];
             var subscribedTags = subscriptions.Keys.ToArray();
             foreach (var tagName in tagNames) {
