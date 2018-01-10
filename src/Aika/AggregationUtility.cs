@@ -791,39 +791,33 @@ namespace Aika {
         /// <param name="tag">The tag definition for the data being aggregated.</param>
         /// <param name="utcStartTime">The UTC start time for the plot data set.</param>
         /// <param name="utcEndTime">The UTC end time for the plot data set.</param>
-        /// <param name="sampleInterval">The sample interval to use when computing the plot data.</param>
+        /// <param name="intervals">
+        ///   The number of intervals to use when computing the plot data (typically the number of 
+        ///   horizontal pixels in the trend that will be visualized using the data).  The method 
+        ///   can return up to 5 samples per interval for numeric tags, and potentially more for 
+        ///   state-based or text-based tags.
+        /// </param>
         /// <param name="rawData">The raw data to use in the calculations.</param>
         /// <returns>
         /// A set of triend-friendly samples.
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than or equal to <paramref name="utcEndTime"/>.</exception>
-        /// <exception cref="ArgumentException"><paramref name="sampleInterval"/> is less than or equal to <see cref="TimeSpan.Zero"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="intervals"/> is less one.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="rawData"/> is <see langword="null"/>.</exception>
         /// <remarks>
-        /// The plot function works by collecting raw values into buckets.  Each bucket has a start time and 
-        /// end time, with the total time range being 4x <paramref name="sampleInterval"/>.  The function 
-        /// iterates over <paramref name="rawData"/> and adds samples to the bucket, until it encounters a 
-        /// sample that has a time stamp that is too big for the bucket.  The function then takes the earliest, 
-        /// latest, minimum and maximum values in the bucket, and adds them to the result data set.
-        /// 
         /// It is important then to note that <see cref="Plot"/> is not guaranteed to give evenly-spaced time 
-        /// stamps in the resulting data set, but instead returns a data set that contains approximately the 
-        /// same number of values that would be returned in an interpolated query using the same start, end 
-        /// and sample interval parameters.
+        /// stamps in the resulting data set.
         /// </remarks>
-        public IEnumerable<TagValue> Plot(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, IEnumerable<TagValue> rawData) {
+        public IEnumerable<TagValue> Plot(TagDefinition tag, DateTime utcStartTime, DateTime utcEndTime, int intervals, IEnumerable<TagValue> rawData) {
             if (tag == null) {
                 throw new ArgumentNullException(nameof(tag));
-            }
-            if (!CanAggregate(tag)) {
-                return Interval(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
             if (utcStartTime >= utcEndTime) {
                 throw new ArgumentException(Resources.Error_StartTimeCannotBeLaterThanEndTime, nameof(utcStartTime));
             }
-            if (sampleInterval <= TimeSpan.Zero) {
-                throw new ArgumentException(Resources.Error_SampleIntervalMustBeGreaterThanZero, nameof(sampleInterval));
+            if (intervals < 1) {
+                throw new ArgumentException(Resources.Error_PositivePointCountIsRequired, nameof(intervals));
             }
             if (rawData == null) {
                 throw new ArgumentNullException(nameof(rawData));
@@ -835,26 +829,19 @@ namespace Aika {
             }
 
             if (_log?.IsEnabled(LogLevel.Debug) ?? false) {
-                _log.LogDebug($"[{DataQueryFunction.Plot}] Performing data aggregation: Start Time = {utcStartTime:yyyy-MM-ddTHH:mm:ss.fffZ}, End Time = {utcEndTime:yyyy-MM-ddTHH:mm:ss.fffZ}, Sample Interval = {sampleInterval}, Raw Data Sample Count = {rawSamples.Length}");
+                _log.LogDebug($"[PLOT] Performing data aggregation: Start Time = {utcStartTime:yyyy-MM-ddTHH:mm:ss.fffZ}, End Time = {utcEndTime:yyyy-MM-ddTHH:mm:ss.fffZ}, Intervals = {intervals}, Raw Data Sample Count = {rawSamples.Length}");
             }
-            CheckRawDataTimeRange(DataQueryFunction.Plot, rawSamples, utcStartTime, utcEndTime);
+            CheckRawDataTimeRange("PLOT", rawSamples, utcStartTime, utcEndTime);
 
             // Set the initial list capacity based on the time range and sample interval.
-            var result = new List<TagValue>((int) ((utcEndTime - utcStartTime).TotalMilliseconds / sampleInterval.TotalMilliseconds));
+            var result = new List<TagValue>((int) ((utcEndTime - utcStartTime).TotalMilliseconds / intervals * 5));
 
             // We will determine the values to return for the plot request by creating aggregation buckets 
-            // that cover a time range that is 4x bigger than the specified sampleInterval.  For each bucket, 
-            // we will add up to 4 raw samples into the resulting data set:
-            //
-            // * The earliest value in the bucket.
-            // * The latest value in the bucket.
-            // * The maximum value in the bucket.
-            // * The minimum value in the bucket.
-            //
-            // If a sample meets more than one of the above conditions, it will only be added to the result 
-            // once.
+            // that cover a time range that is equal to the time range divided by the number of intervals.  
+            // For each bucket, we will select samples into the resulting data set.  The sample selection 
+            // criteria vary according to the data type of the tag.
 
-            var sampleIntervalPerBucket = TimeSpan.FromMilliseconds(sampleInterval.TotalMilliseconds * 4);
+            var sampleIntervalPerBucket = TimeSpan.FromMilliseconds((utcEndTime - utcStartTime).TotalMilliseconds / intervals);
 
             var bucket = new AggregationBucket() {
                 UtcStart = utcStartTime,
@@ -885,8 +872,69 @@ namespace Aika {
             // An interpolated value calculated at utcStartTime.  Included in the final result when a raw 
             // sample does not exactly fall at utcStartTime.
             TagValue interpolatedStartValue = null;
+            // The last value in the previous bucket time range.
+            TagValue lastSampleInPreviousBucket = null;
 
+            // Inline function that will select the samples from the current bucket that we will 
+            // include in the final result.
+            void selectSamplesFromBucket() {
+                if (bucket.Samples.Count == 0) {
+                    return;
+                }
 
+                var significantValues = new HashSet<TagValue>();
+
+                if (tag.DataType == TagDataType.Text || tag.DataType == TagDataType.State) {
+                    // For text or state-based tags, we'll add all value changes that occurred 
+                    // during the bucket time range.
+
+                    var currentState = lastSampleInPreviousBucket;
+                    foreach (var value in bucket.Samples) {
+                        var skip = tag.DataType == TagDataType.Text
+                            ? currentState != null && String.Equals(value.TextValue, currentState.TextValue, StringComparison.OrdinalIgnoreCase)
+                            : currentState != null && currentState.NumericValue == value.NumericValue;
+
+                        if (skip) {
+                            continue;
+                        }
+
+                        currentState = value;
+                        significantValues.Add(value);
+                    }
+                }
+                else {
+                    // For numeric tags, we'll add the following bucket samples:
+                    // 
+                    // * The earliest value in the bucket.
+                    // * The latest value in the bucket.
+                    // * The maximum value in the bucket.
+                    // * The minimum value in the bucket.
+                    //
+                    // If a sample meets more than one of the above conditions, it will only be added to the result 
+                    // once.
+
+                    significantValues.Add(bucket.Samples.First());
+                    significantValues.Add(bucket.Samples.Last());
+
+                    if (bucket.Samples.Any(x => !Double.IsNaN(x.NumericValue))) {
+                        // If any of the samples are numeric, assume that we can aggregate.
+                        significantValues.Add(bucket.Samples.Aggregate((a, b) => a.NumericValue <= b.NumericValue ? a : b)); // min
+                        significantValues.Add(bucket.Samples.Aggregate((a, b) => a.NumericValue >= b.NumericValue ? a : b)); // max
+                    }
+                }
+
+                // For all tags, we'll also add the first non-good-quality value in the bucket.
+                var exceptionValue = bucket.Samples.FirstOrDefault(x => x.Quality != TagValueQuality.Good);
+                if (exceptionValue != null) {
+                    significantValues.Add(exceptionValue);
+                }
+
+                foreach (var item in significantValues.OrderBy(x => x.UtcSampleTime)) {
+                    result.Add(item);
+                }
+            };
+
+            // Start iterating over the raw samples.
             while (sampleEnumerator.MoveNext()) {
                 var currentSample = sampleEnumerator.Current;
 
@@ -923,27 +971,12 @@ namespace Aika {
                 // than our bucket size (e.g. if our bucket size is 20 minutes, but there is a gap of 
                 // 30 minutes between raw samples).
                 while (currentSample.UtcSampleTime > bucket.UtcEnd) {
-                    if (bucket.Samples.Count > 0) {
-                        if (bucket.Samples.Any(x => !Double.IsNaN(x.NumericValue))) {
-                            // If any of the samples are numeric, assume that we can aggregate.
-                            var significantValues = new HashSet<TagValue>();
-                            significantValues.Add(bucket.Samples.First());
-                            significantValues.Add(bucket.Samples.Last());
-                            significantValues.Add(bucket.Samples.Aggregate((a, b) => a.NumericValue <= b.NumericValue ? a : b)); // min
-                            significantValues.Add(bucket.Samples.Aggregate((a, b) => a.NumericValue >= b.NumericValue ? a : b)); // max
-                            foreach (var item in significantValues.OrderBy(x => x.UtcSampleTime)) {
-                                result.Add(item);
-                            }
-                        }
-                        else {
-                            // We don't have any numeric values, so we have to add each value in the bucket.
-                            foreach (var item in bucket.Samples) {
-                                result.Add(item);
-                            }
-                        }
-                        bucket.Samples.Clear();
-                    }
+                    selectSamplesFromBucket();
 
+                    if (bucket.Samples.Count > 0) {
+                        lastSampleInPreviousBucket = bucket.Samples.Last();
+                    }
+                    bucket.Samples.Clear();
                     bucket.UtcStart = bucket.UtcEnd;
                     bucket.UtcEnd = bucket.UtcStart.Add(sampleIntervalPerBucket);
                 }
@@ -953,16 +986,7 @@ namespace Aika {
 
             // We've moved past utcEndTime in the raw data.  If we still have any values in the bucket, 
             // identify the significant values and add them to the result.
-            if (bucket.Samples.Count > 0) {
-                var significantValues = new HashSet<TagValue>();
-                significantValues.Add(bucket.Samples.First());
-                significantValues.Add(bucket.Samples.Last());
-                significantValues.Add(bucket.Samples.Aggregate((a, b) => a.NumericValue <= b.NumericValue ? a : b)); // min
-                significantValues.Add(bucket.Samples.Aggregate((a, b) => a.NumericValue >= b.NumericValue ? a : b)); // max
-                foreach (var item in significantValues.OrderBy(x => x.UtcSampleTime)) {
-                    result.Add(item);
-                }
-            }
+            selectSamplesFromBucket();
 
             if (result.Count == 0) {
                 // Add interpolated values at utcStartTime and utcEndTime, if possible.
@@ -1036,10 +1060,6 @@ namespace Aika {
             // MIN
             if (DataQueryFunction.Minimum.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
                 return Minimum(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
-            }
-            // PLOT
-            if (DataQueryFunction.Plot.Equals(aggregateName, StringComparison.OrdinalIgnoreCase)) {
-                return Plot(tag, utcStartTime, utcEndTime, sampleInterval, rawData);
             }
 
             return new TagValue[0];

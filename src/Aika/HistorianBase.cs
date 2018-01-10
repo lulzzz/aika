@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading;
@@ -183,6 +184,55 @@ namespace Aika {
         /// A dictionary of historical data, indexed by tag name.
         /// </returns>
         public abstract Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken);
+
+
+        /// <summary>
+        /// Reads visualization-friendly plot data.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagNames">The names of the tags to query.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="intervals">
+        ///   The number of intervals to use for the query.  This would typically be the width of the 
+        ///   trend that will be visualized, in pixels.  Implementations may return more or fewer samples 
+        ///   than this number, depending on the implementation of this method.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A dictionary of historical data, indexed by tag name.
+        /// </returns>
+        /// <remarks>
+        /// Override this method to implement a native plot function.  Do not call this implementation 
+        /// in your override.  The default implementation retrieves all raw data between 
+        /// <paramref name="utcStartTime"/> and <paramref name="utcEndTime"/>, and then uses Aika's 
+        /// built-in plot aggregator to reduce the raw data set.
+        /// </remarks>
+        public virtual async Task<IDictionary<string, TagValueCollection>> ReadPlotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int intervals, CancellationToken cancellationToken) {
+            var rawData = await ReadRawData(identity, tagNames, utcStartTime, utcEndTime, 0, cancellationToken).ConfigureAwait(false);
+            var aggregator = new AggregationUtility(LoggerFactory);
+
+            // The aggregation helper requires the definitions of the tags that we are 
+            // processing.
+            var tags = await GetTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
+
+            var result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in rawData) {
+                var tag = tags.FirstOrDefault(x => x.Name.Equals(item.Key, StringComparison.OrdinalIgnoreCase));
+                if (tag == null) {
+                    continue;
+                }
+
+                result[tag.Name] = new TagValueCollection() {
+                    Values = aggregator.Plot(tag, utcStartTime, utcEndTime, intervals, item.Value.Values),
+                    VisualizationHint = tag.DataType == TagDataType.FloatingPoint || tag.DataType == TagDataType.Integer
+                        ? TagValueCollectionVisualizationHint.Interpolated
+                        : TagValueCollectionVisualizationHint.TrailingEdge
+                };
+            }
+
+            return result;
+        }
 
 
         /// <summary>

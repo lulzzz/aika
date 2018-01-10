@@ -67,6 +67,25 @@ namespace Aika {
 
 
         /// <summary>
+        /// Reads visualization-friendly plot data.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagNames">The names of the tags to query.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="intervals">
+        ///   The number of intervals to use for the query.  This would typically be the width of the 
+        ///   trend that will be visualized, in pixels.  Implementations may return more or fewer samples 
+        ///   than this number, depending on the implementation of this method.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A dictionary of historical data, indexed by tag name.
+        /// </returns>
+        Task<IDictionary<string, TagValueCollection>> ReadPlotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int intervals, CancellationToken cancellationToken);
+
+
+        /// <summary>
         /// Performs an aggregated data query on the historian.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>

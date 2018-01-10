@@ -328,6 +328,74 @@ namespace Aika.AspNetCore.Controllers {
 
 
         /// <summary>
+        /// Performs a visualization-friendly data query.
+        /// </summary>
+        /// <param name="request">The raw data request.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// Successful responses contain a dictionary that maps from tag name to historical tag values.
+        /// </returns>
+        [HttpPost]
+        [Route("data/plot")]
+        [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
+        public async Task<IActionResult> GetPlotData([FromBody] PlotDataRequest request, CancellationToken cancellationToken) {
+            if (!ModelState.IsValid) {
+                return BadRequest(ModelState); // 400
+            }
+
+            try {
+                var result = await _historian.ReadPlotData(User, request.Tags, request.Start.ToUtcDateTime(), request.End.ToUtcDateTime(), request.Intervals, cancellationToken).ConfigureAwait(false);
+                return Ok(result.ToDictionary(x => x.Key, x => x.Value.ToHistoricalTagValuesDto())); // 200
+            }
+            catch (ArgumentException) {
+                return BadRequest(); // 400
+            }
+            catch (OperationCanceledException) {
+                return StatusCode(204); // 204
+            }
+            catch (SecurityException) {
+                return Forbid(); // 403
+            }
+            catch (NotSupportedException) {
+                return BadRequest(); // 400
+            }
+            catch (NotImplementedException) {
+                return BadRequest(); // 400
+            }
+        }
+
+
+        /// <summary>
+        /// Performs a visualization-friendly data query.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the response.</param>
+        /// <param name="tag">The tag names to query.</param>
+        /// <param name="start">The UTC start time for the query.</param>
+        /// <param name="end">The UTC end time for the query.</param>
+        /// <param name="intervals">
+        ///   The number of intervals in the query.  Typically, this is the number of horizontal 
+        ///   pixels on the trend that will be rendered using the resulting data.
+        /// </param>
+        /// <returns>
+        /// Successful responses contain a dictionary that maps from tag name to historical tag values.
+        /// </returns>
+        [HttpGet]
+        [Route("data/plot")]
+        [ProducesResponseType(200, Type = typeof(IDictionary<string, HistoricalTagValuesDto>))]
+        public Task<IActionResult> GetPlotData(CancellationToken cancellationToken, [FromQuery] string[] tag, [FromQuery] string start, [FromQuery] string end, [FromQuery] int intervals = 1000) {
+            var model = new PlotDataRequest() {
+                Tags = tag,
+                Start = start,
+                End = end,
+                Intervals = intervals
+            };
+
+            TryValidateModel(model);
+            return GetPlotData(model, cancellationToken);
+        }
+
+
+        /// <summary>
         /// Performs an aggregated data query.
         /// </summary>
         /// <param name="request">The historical data request.</param>

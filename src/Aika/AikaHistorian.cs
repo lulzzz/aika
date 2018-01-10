@@ -320,6 +320,57 @@ namespace Aika {
         }
 
 
+        public async Task<IDictionary<string, TagValueCollection>> ReadPlotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int intervals, CancellationToken cancellationToken) {
+            ThrowIfNotReady();
+
+            if (identity == null) {
+                throw new ArgumentNullException(nameof(identity));
+            }
+
+            if (tagNames == null) {
+                throw new ArgumentNullException(nameof(tagNames));
+            }
+
+            if (utcStartTime > utcEndTime) {
+                throw new ArgumentException(Resources.Error_StartTimeCannotBeLaterThanEndTime, nameof(utcStartTime));
+            }
+
+            if (intervals < 1) {
+                throw new ArgumentException(Resources.Error_PositivePointCountIsRequired, nameof(intervals));
+            }
+
+            var distinctTagNames = tagNames.Where(x => !String.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (distinctTagNames.Length == 0) {
+                throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagNames));
+            }
+
+            var authResult = await RunWithImmediateCancellation(_historian.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+
+            var authorisedTagNames = authResult.Where(x => x.Value).Select(x => x.Key).ToArray();
+            var unauthorisedTagNames = authResult.Where(x => !x.Value).Select(x => x.Key).ToArray();
+
+            IDictionary<string, TagValueCollection> result;
+
+            if (authorisedTagNames.Length == 0) {
+                result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
+            }
+            else {
+                result = await RunWithImmediateCancellation(_historian.ReadPlotData(identity, authorisedTagNames, utcStartTime, utcEndTime, intervals, cancellationToken), cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var tagName in unauthorisedTagNames) {
+                result[tagName] = new TagValueCollection() {
+                    VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
+                    Values = new[] {
+                        TagValue.CreateUnauthorizedTagValue(utcStartTime)
+                    }
+                };
+            }
+
+            return result;
+        }
+
+
         /// <summary>
         /// Performs a historical data query.
         /// </summary>
@@ -376,7 +427,7 @@ namespace Aika {
             IDictionary<string, TagValueCollection> result; 
 
             if (authorisedTagNames.Length == 0) {
-                result = new Dictionary<string, TagValueCollection>();
+                result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
             }
             else {
                 var supportedDataFunctions = await GetAvailableNativeDataQueryFunctions(cancellationToken).ConfigureAwait(false);
@@ -401,7 +452,7 @@ namespace Aika {
                     // processing.
                     var tags = await GetTags(identity, authorisedTagNames, cancellationToken).ConfigureAwait(false);
 
-                    // We need to subtract one interval from the quesry start time for the raw data.  
+                    // We need to subtract one interval from the query start time for the raw data.  
                     // This is so that we can calculate an aggregated value at the utcStartTime that 
                     // the caller specified.
 
@@ -412,9 +463,9 @@ namespace Aika {
 
                     query = _historian.ReadRawData(identity, authorisedTagNames, queryStartTime, utcEndTime, 0, cancellationToken).ContinueWith(t => {
                         var aggregator = new AggregationUtility(_loggerFactory);
-                        // We'll hint that PLOT and INTERP data can be interpolated on a chart, but 
+                        // We'll hint that INTERP data can be interpolated on a chart, but 
                         // other functions should use trailing-edge transitions.
-                        var visualizationHint = DataQueryFunction.Interpolated.Equals(dataFunction, StringComparison.OrdinalIgnoreCase) || DataQueryFunction.Plot.Equals(dataFunction, StringComparison.OrdinalIgnoreCase)
+                        var visualizationHint = DataQueryFunction.Interpolated.Equals(dataFunction, StringComparison.OrdinalIgnoreCase)
                             ? TagValueCollectionVisualizationHint.Interpolated
                             : TagValueCollectionVisualizationHint.TrailingEdge;
 

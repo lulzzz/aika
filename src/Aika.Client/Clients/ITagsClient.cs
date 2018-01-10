@@ -73,6 +73,18 @@ namespace Aika.Client.Clients {
 
 
         /// <summary>
+        /// Reads visualization-friendly data values for a set of tags.  Authorized using the 
+        /// <c>aika:readtagdata</c> authorization policy.
+        /// </summary>
+        /// <param name="request">The plot data request.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will return the plot data values for the tags, indexed by tag name.
+        /// </returns>
+        Task<IDictionary<string, HistoricalTagValuesDto>> ReadPlotValues(PlotDataRequest request, CancellationToken cancellationToken);
+
+
+        /// <summary>
         /// Reads processed (aggregated) data values for a set of tags.  Authorized using the 
         /// <c>aika:readtagdata</c> authorization policy.
         /// </summary>

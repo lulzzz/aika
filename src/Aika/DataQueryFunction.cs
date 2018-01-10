@@ -66,11 +66,6 @@ namespace Aika {
         public const string Interpolated = "INTERP";
 
         /// <summary>
-        /// Visualization-friendly data.
-        /// </summary>
-        public const string Plot = "PLOT";
-
-        /// <summary>
         /// Average value, calculated over a given sample interval.
         /// </summary>
         public const string Average = "AVG";
@@ -90,7 +85,6 @@ namespace Aika {
         /// </summary>
         internal static readonly IEnumerable<DataQueryFunction> DefaultFunctions = new[] {
             new DataQueryFunction(Interpolated, "Calculates interpolated values at a given sample interval", false),
-            new DataQueryFunction(Plot, "Visualization-friendly data", false),
             new DataQueryFunction(Average, "Calculates the average value of a tag at a given sample interval", false),
             new DataQueryFunction(Minimum, "Calculates the minimum value of a tag at a given sample interval", false),
             new DataQueryFunction(Maximum, "Calculates the maximum value of a tag at a given sample interval", false)
