@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Aika
-{
+namespace Aika {
     /// <summary>
     /// Describes an update to settings for exception or compression filtering on a tag.
     /// </summary>

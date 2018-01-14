@@ -29,7 +29,12 @@ namespace Aika {
         /// <summary>
         /// Ensures that only one archive insert can occur at a time.
         /// </summary>
-        private readonly SemaphoreSlim _archiveLock = new SemaphoreSlim(1, 1);
+        private int _archiveLock;
+
+        /// <summary>
+        /// Holds pending archive writes.
+        /// </summary>
+        private readonly ConcurrentQueue<PendingArchiveWrite> _pendingArchiveWrites = new ConcurrentQueue<PendingArchiveWrite>();
 
         /// <summary>
         /// Gets the unique identifier for the tag.
@@ -160,10 +165,17 @@ namespace Aika {
                     _logger.LogTrace($"[{Name}] Archiving {values.Count()} values emitted by the compression filter.");
                 }
 
+                _pendingArchiveWrites.Enqueue(new PendingArchiveWrite() { ArchiveValues = values, NextArchiveCandidate = nextArchiveCandidate });
+
                 _historian.TaskRunner.RunBackgroundTask(async ct => {
-                    await _archiveLock.WaitAsync(ct).ConfigureAwait(false);
+                    if (Interlocked.CompareExchange(ref _archiveLock, 1, 0) != 0) {
+                        return;
+                    }
+
                     try {
-                        await InsertArchiveValuesInternal(ClaimsPrincipal.Current, values, nextArchiveCandidate, false, ct).ConfigureAwait(false);
+                        while (!ct.IsCancellationRequested && _pendingArchiveWrites.TryDequeue(out var item)) {
+                            await InsertArchiveValuesInternal(ClaimsPrincipal.Current, item.ArchiveValues, item.NextArchiveCandidate, false, ct).ConfigureAwait(false);
+                        }
                     }
                     catch (OperationCanceledException) {
                         // App is shutting down...
@@ -172,7 +184,7 @@ namespace Aika {
                         _logger?.LogError($"[{Name}] An error occurred while archiving values emitted by the compression filter.", e);
                     }
                     finally {
-                        _archiveLock.Release();
+                        _archiveLock = 0;
                     }
                 });
             };
@@ -333,13 +345,7 @@ namespace Aika {
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         public async Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
-            await _archiveLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try {
-                return await InsertArchiveValuesInternal(identity, values, DataFilter.CompressionFilter.LastReceivedValue, true, cancellationToken).ConfigureAwait(false);
-            }
-            finally {
-                _archiveLock.Release();
-            }
+            return await InsertArchiveValuesInternal(identity, values, DataFilter.CompressionFilter.LastReceivedValue, true, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -435,6 +441,24 @@ namespace Aika {
         /// </summary>
         protected void OnDeleted() {
             Deleted?.Invoke(this);
+        }
+
+
+        /// <summary>
+        /// Describes a pending write to the historian.
+        /// </summary>
+        private class PendingArchiveWrite {
+
+            /// <summary>
+            /// The values to permanently write to the archive.
+            /// </summary>
+            public TagValue[] ArchiveValues { get; set; }
+
+            /// <summary>
+            /// The value to write as the next archive candidate.
+            /// </summary>
+            public TagValue NextArchiveCandidate { get; set; }
+
         }
 
 
