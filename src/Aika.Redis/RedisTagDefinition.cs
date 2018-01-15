@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -69,10 +70,9 @@ namespace Aika.Redis {
         /// <param name="historian">The owning historian.</param>
         /// <param name="id">The tag ID.</param>
         /// <param name="settings">The tag settings.</param>
-        /// <param name="utcCreatedAt">The UTC creation time for the tag.</param>
-        /// <param name="utcLastModifiedAt">The UTC last-modified time for the tag.</param>
         /// <param name="initialTagValues">The initial tag values, used to prime the exception and compression filters for the tag.</param>
-        private RedisTagDefinition(RedisHistorian historian, string id, TagSettings settings, DateTime utcCreatedAt, DateTime utcLastModifiedAt, InitialTagValues initialTagValues) : base(historian, id, settings, utcCreatedAt, utcLastModifiedAt, initialTagValues) {
+        /// <param name="changeHistory">The change history for the tag.</param>
+        private RedisTagDefinition(RedisHistorian historian, string id, TagSettings settings, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) : base(historian, id, settings, initialTagValues, changeHistory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _tagDefinitionKey = _historian.GetKeyForTagDefinition(Id);
             _snapshotKey = _historian.GetKeyForSnapshotData(Id);
@@ -167,14 +167,15 @@ namespace Aika.Redis {
         /// </summary>
         /// <param name="historian">The historian for the tag.</param>
         /// <param name="settings">The tag settings.</param>
+        /// <param name="creator">The tag's creator.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A task that will create a new <see cref="RedisTagDefinition"/> and save it to the 
         /// historian's Redis server.
         /// </returns>
-        internal static async Task<RedisTagDefinition> Create(RedisHistorian historian, TagSettings settings, CancellationToken cancellationToken) {
+        internal static async Task<RedisTagDefinition> Create(RedisHistorian historian, TagSettings settings, ClaimsPrincipal creator, CancellationToken cancellationToken) {
             var now = DateTime.UtcNow;
-            var result = new RedisTagDefinition(historian, null, settings, now, now, null);
+            var result = new RedisTagDefinition(historian, null, settings, null, new[] { TagChangeHistoryEntry.Created(creator) });
             var key = historian.GetKeyForTagIdsList();
             
             await Task.WhenAny(Task.WhenAll(result.Save(cancellationToken), historian.Connection.GetDatabase().ListRightPushAsync(key, result.Id)), Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
@@ -210,8 +211,6 @@ namespace Aika.Redis {
                                        new HashEntry("COM_LIMIT_TYPE", (int) DataFilter.CompressionFilter.Settings.LimitType),
                                        new HashEntry("COM_LIMIT", DataFilter.CompressionFilter.Settings.Limit),
                                        new HashEntry("COM_WINDOW", DataFilter.CompressionFilter.Settings.WindowSize.ToString()),
-                                       new HashEntry("CREATED", UtcCreatedAt.Ticks),
-                                       new HashEntry("MODIFIED", UtcLastModifiedAt.Ticks)
                                    });
 
             await Task.WhenAny(t, Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
@@ -247,9 +246,6 @@ namespace Aika.Redis {
             TagValueFilterDeviationType compressionFilterLimitType = default(TagValueFilterDeviationType);
             double compressionFilterLimit = 0;
             TimeSpan compressionFilterWindowSize = default(TimeSpan);
-
-            DateTime utcCreatedAt = default(DateTime);
-            DateTime utcLastModifiedAt = default(DateTime);
 
             foreach (var item in values) {
                 switch (item.Name.ToString()) {
@@ -292,12 +288,6 @@ namespace Aika.Redis {
                     case "COM_WINDOW":
                         compressionFilterWindowSize = TimeSpan.Parse(item.Value);
                         break;
-                    case "CREATED":
-                        utcCreatedAt = new DateTime((long) item.Value, DateTimeKind.Utc);
-                        break;
-                    case "MODIFIED":
-                        utcLastModifiedAt = new DateTime((long) item.Value, DateTimeKind.Utc);
-                        break;
                 }
             }
 
@@ -337,9 +327,8 @@ namespace Aika.Redis {
             var result = new RedisTagDefinition(historian,
                                                 tagId,
                                                 settings,
-                                                utcCreatedAt,
-                                                utcLastModifiedAt,
-                                                initialValues);
+                                                initialValues,
+                                                null);
 
             return result;
         }
@@ -647,13 +636,42 @@ namespace Aika.Redis {
                 sampleCount = MaximumRawSampleCount;
             }
 
-            // TODO: investigate use of Lua scripts to do aggregation on the server side for non-raw queries?
+            // TODO: investigate use of Lua scripts to select raw values immediately outside the boundaries of the data query
 
-            var rawSampleValuesTask = _historian.Connection.GetDatabase().SortedSetRangeByScoreAsync(_archiveKey, startTimeScore, endTimeScore, Exclude.None, Order.Ascending, 0, sampleCount, CommandFlags.None);
+            var db = _historian.Connection.GetDatabase();
+            var rawSampleValuesTask = db.SortedSetRangeByScoreWithScoresAsync(_archiveKey, 
+                                                                              startTimeScore, 
+                                                                              endTimeScore, 
+                                                                              Exclude.None, 
+                                                                              Order.Ascending, 
+                                                                              0,
+                                                                              sampleCount,
+                                                                              CommandFlags.None);
             await Task.WhenAny(rawSampleValuesTask, Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
             var rawSampleValues = rawSampleValuesTask.Result;
+
+            var preBoundValues = new List<TagValue>();
+
+            var first = rawSampleValues.FirstOrDefault();
+            if (first.Score > startTimeScore) {
+                // The first raw sample is later than that start time the user specified.  We'll find 
+                // the rank of the first raw value we got back, and get the item at the index 
+                // immediately before that one, of possible.
+
+                var rankTask = db.SortedSetRankAsync(_archiveKey, first.Element);
+                await Task.WhenAny(rankTask, Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (rankTask.Result > 0) {
+                    var preBoundValueTask = db.SortedSetRangeByRankAsync(_archiveKey, rankTask.Result.Value - 1, rankTask.Result.Value - 1);
+                    await Task.WhenAny(preBoundValueTask, Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    preBoundValues.AddRange(preBoundValueTask.Result.Select(x => JsonConvert.DeserializeObject<RedisTagValue>(x)?.ToTagValue()));
+                }
+            }
 
             var nonArchiveValues = new List<TagValue>();
 
@@ -667,7 +685,7 @@ namespace Aika.Redis {
                 nonArchiveValues.Add(snapshot);
             }
 
-            return rawSampleValues.Select(x => JsonConvert.DeserializeObject<RedisTagValue>(x)?.ToTagValue()).Concat(nonArchiveValues).ToArray();
+            return preBoundValues.Concat(rawSampleValues.Select(x => JsonConvert.DeserializeObject<RedisTagValue>(x.Element)?.ToTagValue())).Concat(nonArchiveValues).ToArray();
         }
 
         #endregion

@@ -22,14 +22,9 @@ namespace Aika.Client.Dto {
         public TagValueFilterSettingsDto CompressionFilterSettings { get; set; }
 
         /// <summary>
-        /// Gets or sets the UTC time that the tag was created at.
+        /// Gets or sets the change history information for the tag.
         /// </summary>
-        public DateTime UtcCreatedAt { get; set; }
-
-        /// <summary>
-        /// Gets or sets the UTC time that the tag was last modified at.
-        /// </summary>
-        public DateTime UtcLastModifiedAt { get; set; }
+        public TagChangeHistoryEntryDto[] ChangeHistory { get; set; }
 
         /// <summary>
         /// Gets or sets bespoke properties for the tag.

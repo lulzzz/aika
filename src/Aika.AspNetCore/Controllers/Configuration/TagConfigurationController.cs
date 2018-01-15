@@ -200,13 +200,13 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         [HttpPut]
         [Route("{id}")]
         [ProducesResponseType(200, Type = typeof(TagDefinitionExtendedDto))]
-        public async Task<IActionResult> UpdateTag([FromRoute] string id, [FromBody] TagSettings tag, CancellationToken cancellationToken) {
+        public async Task<IActionResult> UpdateTag([FromRoute] string id, [FromBody] TagDefinitionUpdateDto tag, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
 
             try {
-                var result = await _historian.UpdateTag(User, id, tag, cancellationToken).ConfigureAwait(false);
+                var result = await _historian.UpdateTag(User, id, tag.ToTagDefinitionUpdate(), tag.ChangeDescription, cancellationToken).ConfigureAwait(false);
                 return Ok(result.ToTagDefinitionExtendedDto()); // 200
             }
             catch (ArgumentException) {

@@ -32,10 +32,16 @@ namespace Aika {
         public abstract IDictionary<string, object> Properties { get; }
 
         /// <summary>
-        /// Gets the <see cref="ILoggerFactory"/> to use when creating loggers for the historian and 
-        /// any underlying components.
+        /// Gets the <see cref="ILoggerFactory"/> to use when creating loggers for any underlying 
+        /// components.
         /// </summary>
         protected internal ILoggerFactory LoggerFactory { get; }
+
+        /// <summary>
+        /// Gets the <see cref="ILogger"/> for the historian.  This will be <see langword="null"/> if 
+        /// no <see cref="ILoggerFactory"/> was provided when creating the historian.
+        /// </summary>
+        protected ILogger Logger { get; }
 
         /// <summary>
         /// Gets the <see cref="ITaskRunner"/> that the historian implementation should use to run 
@@ -62,6 +68,7 @@ namespace Aika {
         protected HistorianBase(ITaskRunner taskRunner, ILoggerFactory loggerFactory) {
             TaskRunner = taskRunner ?? throw new ArgumentNullException(nameof(taskRunner));
             LoggerFactory = loggerFactory;
+            Logger = LoggerFactory?.CreateLogger(GetType());
         }
 
         #endregion
@@ -320,14 +327,16 @@ namespace Aika {
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagId">The ID of the tag to update.</param>
         /// <param name="update">The updated tag definition.</param>
+        /// <param name="description">A description of the change.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// The updated tag definition.
         /// </returns>
         /// <remarks>
-        /// Implementers should call <see cref="TagDefinition.Update(TagSettings)"/> to update the target tag.
+        /// Implementers should call <see cref="TagDefinition.Update(TagSettings, ClaimsPrincipal, String)"/> 
+        /// to update the target tag.
         /// </remarks>
-        public abstract Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, CancellationToken cancellationToken);
+        public abstract Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, string description, CancellationToken cancellationToken);
 
 
         /// <summary>

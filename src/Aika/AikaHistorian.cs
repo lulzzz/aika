@@ -974,6 +974,7 @@ namespace Aika {
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagId">The ID of the tag to update.</param>
         /// <param name="settings">The updated tag settings.</param>
+        /// <param name="description">The description of the change.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A task that will return the updated tag definition.
@@ -982,7 +983,8 @@ namespace Aika {
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="tagId"/> is <see langword="null"/> or white space.</exception>
-        public async Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings settings, CancellationToken cancellationToken) {
+        /// <exception cref="ArgumentException"><paramref name="description"/> is <see langword="null"/> or white space.</exception>
+        public async Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings settings, string description, CancellationToken cancellationToken) {
             ThrowIfNotReady();
 
             if (identity == null) {
@@ -997,6 +999,10 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(settings));
             }
 
+            if (String.IsNullOrWhiteSpace(description)) {
+                throw new ArgumentException(Resources.Error_ChangeDescriptionIsRequired, nameof(description));
+            }
+
             if (settings.ExceptionFilterSettings != null) {
                 settings.ExceptionFilterSettings = ValidateExceptionFilterSettings(settings.DataType, settings.ExceptionFilterSettings);
             }
@@ -1005,7 +1011,7 @@ namespace Aika {
                 settings.CompressionFilterSettings = ValidateCompressionFilterSettings(settings.DataType, settings.CompressionFilterSettings);
             }
 
-            return await _historian.UpdateTag(identity, tagId, settings, cancellationToken).ConfigureAwait(false);
+            return await _historian.UpdateTag(identity, tagId, settings, description, cancellationToken).ConfigureAwait(false);
         }
 
 

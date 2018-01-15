@@ -79,6 +79,15 @@ namespace Aika {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to You must specify a change description..
+        /// </summary>
+        internal static string Error_ChangeDescriptionIsRequired {
+            get {
+                return ResourceManager.GetString("Error_ChangeDescriptionIsRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Last-archived value cannot be more recent than last-received value..
         /// </summary>
         internal static string Error_CompressionFilter_LastArchivedValueCannotBeNewerThanLastReceivedValue {
@@ -201,6 +210,15 @@ namespace Aika {
         internal static string Error_UnsupportedDataFunction {
             get {
                 return ResourceManager.GetString("Error_UnsupportedDataFunction", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Created..
+        /// </summary>
+        internal static string TagModification_Created {
+            get {
+                return ResourceManager.GetString("TagModification_Created", resourceCulture);
             }
         }
         

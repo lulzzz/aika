@@ -68,14 +68,14 @@ namespace Aika {
         public string StateSet { get; private set; }
 
         /// <summary>
-        /// Gets the UTC creation time for the tag.
+        /// Gets the change history for the tag.
         /// </summary>
-        public DateTime UtcCreatedAt { get; private set; }
+        private readonly List<TagChangeHistoryEntry> _changeHistory = new List<TagChangeHistoryEntry>();
 
         /// <summary>
-        /// Gets the UTC last-modified time for the tag.
+        /// Gets the change history for the tag.
         /// </summary>
-        public DateTime UtcLastModifiedAt { get; private set; }
+        public IEnumerable<TagChangeHistoryEntry> ChangeHistory { get { return _changeHistory.ToArray(); } }
 
         /// <summary>
         /// The snapshot value of the tag.
@@ -131,13 +131,12 @@ namespace Aika {
         /// <param name="historian">The <see cref="IHistorian"/> instance that the tag belongs to.</param>
         /// <param name="id">The tag ID.  If <see langword="null"/>, a new tag ID will ge generated automatically.</param>
         /// <param name="settings">The tag settings.</param>
-        /// <param name="utcCreatedAt">The UTC creation time for the tag.</param>
-        /// <param name="utcLastModifiedAt">The UTC last-modified time for the tag.</param>
         /// <param name="initialTagValues">The initial values to configure the tag's exception and compression filters with.</param>
+        /// <param name="changeHistory">The change history for the tag.</param>
         /// <exception cref="ArgumentNullException"><paramref name="historian"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
         /// <exception cref="ValidationException"><paramref name="settings"/> is not valid.</exception>
-        protected TagDefinition(HistorianBase historian, string id, TagSettings settings, DateTime? utcCreatedAt, DateTime? utcLastModifiedAt, InitialTagValues initialTagValues) {
+        protected TagDefinition(HistorianBase historian, string id, TagSettings settings, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _logger = _historian.LoggerFactory?.CreateLogger<TagDefinition>();
 
@@ -155,8 +154,10 @@ namespace Aika {
             StateSet = settings.StateSet;
             var exceptionFilterSettings = settings.ExceptionFilterSettings?.ToTagValueFilterSettings() ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
             var compressionFilterSettings = settings.CompressionFilterSettings?.ToTagValueFilterSettings() ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
-            UtcCreatedAt = utcCreatedAt ?? DateTime.UtcNow;
-            UtcLastModifiedAt = utcLastModifiedAt ?? UtcCreatedAt;
+            
+            if (changeHistory != null) {
+                _changeHistory.AddRange(changeHistory);
+            }
 
             _snapshotValue = initialTagValues?.SnapshotValue;
             DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, _snapshotValue), new CompressionFilterState(compressionFilterSettings, initialTagValues?.LastArchivedValue, initialTagValues?.NextArchiveCandidateValue), _historian.LoggerFactory);
@@ -406,8 +407,13 @@ namespace Aika {
         /// Updates the tag.
         /// </summary>
         /// <param name="update">The updated tag settings.</param>
+        /// <param name="modifier">The tag's modifier.</param>
+        /// <param name="description">The description of the update.</param>
+        /// <returns>
+        /// The new change history entry for the tag.
+        /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="update"/> is <see langword="null"/>.</exception>
-        public virtual void Update(TagSettings update) {
+        public virtual TagChangeHistoryEntry Update(TagSettings update, ClaimsPrincipal modifier, string description) {
             if (update == null) {
                 throw new ArgumentNullException(nameof(update));
             }
@@ -432,7 +438,12 @@ namespace Aika {
                 DataFilter.CompressionFilter.Settings.Update(update.CompressionFilterSettings);
             }
 
+            var historyItem = TagChangeHistoryEntry.Updated(modifier, description);
+            _changeHistory.Add(historyItem);
+
             Updated?.Invoke(this);
+
+            return historyItem;
         }
 
 

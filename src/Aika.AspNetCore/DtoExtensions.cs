@@ -177,8 +177,12 @@ namespace Aika.AspNetCore {
                     : null,
                 ExceptionFilterSettings = tagDefinition.DataFilter.ExceptionFilter.Settings.ToTagValueFilterSettingsDto(),
                 CompressionFilterSettings = tagDefinition.DataFilter.CompressionFilter.Settings.ToTagValueFilterSettingsDto(),
-                UtcCreatedAt = tagDefinition.UtcCreatedAt,
-                UtcLastModifiedAt = tagDefinition.UtcLastModifiedAt,
+                ChangeHistory = tagDefinition.ChangeHistory.Select(x => new TagChangeHistoryEntryDto() {
+                    Id = x.Id,
+                    UtcTime = x.UtcTime,
+                    User = x.User,
+                    Description = x.Description
+                }).ToArray(),
                 Properties = new Dictionary<string, object>(tagDefinition.GetProperties())
             };
         }

@@ -52,5 +52,13 @@ namespace Aika.Client.Dto {
         /// </summary>
         public TagValueFilterSettingsDto CompressionFilterSettings { get; set; }
 
+        /// <summary>
+        /// Gets or sets the description of the change.
+        /// </summary>
+        [Required]
+        [MinLength(1)]
+        [MaxLength(200)]
+        public string ChangeDescription { get; set; }
+
     }
 }

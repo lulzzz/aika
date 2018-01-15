@@ -267,12 +267,12 @@ namespace Aika.Historians {
         }
 
 
-        public override Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, CancellationToken cancellationToken) {
+        public override Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, string description, CancellationToken cancellationToken) {
             if (!_tags.TryGetValue(tagId, out var tag)) {
                 throw new ArgumentException($"Could not find tag with ID or name \"{tagId}\".", nameof(tagId));
             }
 
-            tag.Update(update);
+            tag.Update(update, identity, description);
             return Task.FromResult<TagDefinition>(tag);
         }
 

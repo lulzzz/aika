@@ -428,7 +428,7 @@ namespace Aika.Redis {
         /// The new tag definition.
         /// </returns>
         public override async Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagSettings tag, CancellationToken cancellationToken) {
-            var tagDefinition = await RedisTagDefinition.Create(this, tag, cancellationToken).ConfigureAwait(false);
+            var tagDefinition = await RedisTagDefinition.Create(this, tag, identity, cancellationToken).ConfigureAwait(false);
             _tags[tagDefinition.Id] = tagDefinition;
 
             return tagDefinition;
@@ -441,11 +441,12 @@ namespace Aika.Redis {
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagId">The ID of the tag to update.</param>
         /// <param name="update">The updated tag definition.</param>
+        /// <param name="description">The change description</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// The updated tag definition.
         /// </returns>
-        public override Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, CancellationToken cancellationToken) {
+        public override Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, string description, CancellationToken cancellationToken) {
             if (tagId == null) {
                 throw new ArgumentNullException(nameof(tagId));
             }
@@ -457,7 +458,7 @@ namespace Aika.Redis {
                 throw new ArgumentException(Resources.Error_InvalidTagId, nameof(tagId));
             }
 
-            tag.Update(update);
+            tag.Update(update, identity, description);
 
             return Task.FromResult<TagDefinition>(tag);
         }

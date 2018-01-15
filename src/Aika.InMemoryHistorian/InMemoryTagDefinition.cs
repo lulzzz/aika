@@ -16,7 +16,7 @@ namespace Aika.Historians {
         internal ConcurrentDictionary<string, object> Properties { get; } = new ConcurrentDictionary<string, object>();
 
 
-        internal InMemoryTagDefinition(InMemoryHistorian historian, string id, TagSettings tagSettings) : base(historian, id, tagSettings, null, null, null) {
+        internal InMemoryTagDefinition(InMemoryHistorian historian, string id, TagSettings tagSettings) : base(historian, id, tagSettings, null, null) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
         }
 

@@ -41,14 +41,15 @@ namespace Aika {
         /// <param name="identity">The identity of the caller.</param>
         /// <param name="tagId">The ID of the tag to update.</param>
         /// <param name="update">The updated tag definition.</param>
+        /// <param name="description">A description of the change.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// The updated tag definition.
         /// </returns>
         /// <remarks>
-        /// Implementers should call <see cref="TagDefinition.Update(TagSettings)"/> to update the target tag.
+        /// Implementers should call <see cref="TagDefinition.Update(TagSettings, ClaimsPrincipal, String)"/> to update the target tag.
         /// </remarks>
-        Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, CancellationToken cancellationToken);
+        Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, string description, CancellationToken cancellationToken);
 
 
         /// <summary>
