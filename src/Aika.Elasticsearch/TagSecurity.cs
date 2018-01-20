@@ -19,6 +19,7 @@ namespace Aika.Elasticsearch
         public string ClaimType { get; set; }
 
         public string Value { get; set; }
+
     }
 
 }

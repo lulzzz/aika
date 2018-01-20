@@ -14,7 +14,7 @@ namespace Aika.Elasticsearch {
 
         private readonly ILogger _logger;
 
-        private readonly ElasticHistorian _historian;
+        private readonly ElasticsearchHistorian _historian;
 
         private readonly TimeSpan _interval;
 
@@ -27,7 +27,7 @@ namespace Aika.Elasticsearch {
         private readonly CancellationTokenSource _ctSource = new CancellationTokenSource();
 
 
-        internal BackgroundSnapshotValuesWriter(ElasticHistorian historian, TimeSpan writeInterval, ILoggerFactory loggerFactory) {
+        internal BackgroundSnapshotValuesWriter(ElasticsearchHistorian historian, TimeSpan writeInterval, ILoggerFactory loggerFactory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _logger = loggerFactory?.CreateLogger<BackgroundSnapshotValuesWriter>();
             _interval = writeInterval;
@@ -80,7 +80,7 @@ namespace Aika.Elasticsearch {
                                 continue;
                             }
                             var op = new BulkIndexOperation<TagValueDocument>(item.Value.ToTagValueDocument(tag, tag.IdAsGuid)) {
-                                Index = ElasticHistorian.SnapshotValuesIndexName
+                                Index = ElasticsearchHistorian.SnapshotValuesIndexName
                             };
                             descriptor.AddOperation(op);
                             send = true;

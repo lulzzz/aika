@@ -162,6 +162,25 @@ namespace Aika {
 
 
         /// <summary>
+        /// Tests if an aggregate data function is supported by the specified tags.  The default 
+        /// implementation returns <see langword="true"/> for numeric tags, and <see langword="false"/> 
+        /// for non-numeric tags.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagNames">The names of the tags to query.</param>
+        /// <param name="dataFunction">The data query function.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A dictionary that maps from tag name to a flag indicating if the tag supports the 
+        /// <paramref name="dataFunction"/>.
+        /// </returns>
+        public virtual async Task<IDictionary<string, bool>> IsDataQueryFunctionSupported(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, CancellationToken cancellationToken) {
+            var tags = await GetTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
+            return tags.ToDictionary(x => x.Name, x => x.DataType == TagDataType.FloatingPoint || x.DataType == TagDataType.Integer, StringComparer.OrdinalIgnoreCase);
+        }
+
+
+        /// <summary>
         /// Retrieves snapshot data from the historian.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>

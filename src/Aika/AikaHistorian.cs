@@ -439,9 +439,57 @@ namespace Aika {
                     // For functons that are supported by the underlying historian, delegate the 
                     // request to the there.
 
-                    query = pointCount.HasValue
-                        ? _historian.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
-                        : _historian.ReadProcessedData(identity, authorisedTagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
+                    // Check which of the tags actually support the data function being used.
+
+                    var canUseFunc = await _historian.IsDataQueryFunctionSupported(identity, authorisedTagNames, func.Name, cancellationToken).ConfigureAwait(false);
+
+                    var supportedTags = new List<string>();
+                    foreach (var tag in authorisedTagNames) {
+                        if (canUseFunc.TryGetValue(tag, out var supported) && supported) {
+                            supportedTags.Add(tag);
+                        }
+                    }
+
+                    var unsupportedTags = authorisedTagNames.Except(supportedTags).ToArray();
+
+                    if (unsupportedTags.Length == 0) {
+                        // All the tags in the request support the data function; we just need to make 
+                        // a single ReadProcessedData call.
+
+                        query = pointCount.HasValue
+                            ? _historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
+                            : _historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
+                    }
+                    else {
+                        // Support for the data function is mixed.  We'll request processed data for 
+                        // the tags that support it, and raw data for those that don't.
+
+                        query = Task.Run(async () => {
+                            IDictionary<string, TagValueCollection> res = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
+
+                            var supportedQuery = pointCount.HasValue
+                                ? _historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
+                                : _historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
+
+                            var pc = pointCount.HasValue
+                                ? pointCount.Value
+                                : (int) Math.Ceiling((utcEndTime - utcStartTime).TotalMilliseconds / sampleInterval.TotalMilliseconds);
+                            var unsupportedQuery = _historian.ReadRawData(identity, unsupportedTags, utcStartTime, utcEndTime, pc, cancellationToken);
+
+                            await Task.WhenAll(supportedQuery, unsupportedQuery).ConfigureAwait(false);
+                            cancellationToken.ThrowIfCancellationRequested();
+
+                            foreach (var item in supportedQuery.Result) {
+                                res[item.Key] = item.Value;
+                            }
+
+                            foreach (var item in unsupportedQuery.Result) {
+                                res[item.Key] = item.Value;
+                            }
+
+                            return res;
+                        });
+                    }
                 }
                 else if (AggregationUtility.IsSupportedFunction(dataFunction)) {
                     // For functions that are not supported by the underlying historian but are 

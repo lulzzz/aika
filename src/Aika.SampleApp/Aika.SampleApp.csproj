@@ -5,11 +5,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Logs\**" />
+    <Content Remove="Logs\**" />
+    <EmbeddedResource Remove="Logs\**" />
+    <None Remove="Logs\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.5" />
+    <PackageReference Include="Serilog.Extensions.Logging.File" Version="2.0.0-dev-00023" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="1.1.0" />
   </ItemGroup>
 
@@ -20,6 +28,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Aika.AspNetCore\Aika.AspNetCore.csproj" />
     <ProjectReference Include="..\Aika.Client\Aika.Client.csproj" />
+    <ProjectReference Include="..\Aika.Elasticsearch\Aika.Elasticsearch.csproj" />
     <ProjectReference Include="..\Aika.InMemoryHistorian\Aika.InMemoryHistorian.csproj" />
     <ProjectReference Include="..\Aika.Redis\Aika.Redis.csproj" />
     <ProjectReference Include="..\Aika\Aika.csproj" />

@@ -95,6 +95,11 @@ namespace Aika {
         public DataFilter DataFilter { get; }
 
         /// <summary>
+        /// Gets the metadata for the tag.
+        /// </summary>
+        public TagMetadata Metadata { get; }
+
+        /// <summary>
         /// Holds snapshot subscribers.
         /// </summary>
         private readonly ConcurrentDictionary<SnapshotValueSubscription, object> _snapshotSubscriptions = new ConcurrentDictionary<SnapshotValueSubscription, object>();
@@ -131,12 +136,14 @@ namespace Aika {
         /// <param name="historian">The <see cref="IHistorian"/> instance that the tag belongs to.</param>
         /// <param name="id">The tag ID.  If <see langword="null"/>, a new tag ID will ge generated automatically.</param>
         /// <param name="settings">The tag settings.</param>
+        /// <param name="metadata">The tag metadata.</param>
         /// <param name="initialTagValues">The initial values to configure the tag's exception and compression filters with.</param>
         /// <param name="changeHistory">The change history for the tag.</param>
         /// <exception cref="ArgumentNullException"><paramref name="historian"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="metadata"/> is <see langword="null"/>.</exception>
         /// <exception cref="ValidationException"><paramref name="settings"/> is not valid.</exception>
-        protected TagDefinition(HistorianBase historian, string id, TagSettings settings, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) {
+        protected TagDefinition(HistorianBase historian, string id, TagSettings settings, TagMetadata metadata, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _logger = _historian.LoggerFactory?.CreateLogger<TagDefinition>();
 
@@ -152,6 +159,7 @@ namespace Aika {
             Units = settings.Units;
             DataType = settings.DataType;
             StateSet = settings.StateSet;
+            Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
             var exceptionFilterSettings = settings.ExceptionFilterSettings?.ToTagValueFilterSettings() ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
             var compressionFilterSettings = settings.CompressionFilterSettings?.ToTagValueFilterSettings() ?? new TagValueFilterSettings(false, TagValueFilterDeviationType.Absolute, 0, TimeSpan.FromDays(1));
             
@@ -440,6 +448,9 @@ namespace Aika {
 
             var historyItem = TagChangeHistoryEntry.Updated(modifier, description);
             _changeHistory.Add(historyItem);
+
+            Metadata.UtcLastModifiedAt = historyItem.UtcTime;
+            Metadata.LastModifiedBy = historyItem.User;
 
             Updated?.Invoke(this);
 

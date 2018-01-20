@@ -92,6 +92,8 @@ namespace Aika.SampleApp {
         internal static System.Security.Claims.ClaimsPrincipal GetSystemIdentity() {
             var identity = new System.Security.Claims.ClaimsIdentity("AikaSystem");
 
+            identity.AddClaim(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, Guid.Empty.ToString()));
+            identity.AddClaim(new System.Security.Claims.Claim(identity.NameClaimType, "AikaSystem"));
             identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Aika.AspNetCore.Authorization.Policies.Administrator));
             identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Aika.AspNetCore.Authorization.Policies.ManageTags));
             identity.AddClaim(new System.Security.Claims.Claim(identity.RoleClaimType, Aika.AspNetCore.Authorization.Policies.ReadTagData));
@@ -228,7 +230,7 @@ namespace Aika.SampleApp {
                 var runningStateSnapshot = new TagValue(sampleTime, runningStateRunning.Value, runningStateRunning.Name, TagValueQuality.Good, null);
 
                 // Use the task runner to perform the actual write, so that we can approximately 
-                // keep to our 30 second schedule.
+                // keep to our 5 second schedule.
                 _taskRunner.RunBackgroundTask(ct =>
                     _historian.WriteTagData(identity,
                                             new Dictionary<string, IEnumerable<TagValue>>() {

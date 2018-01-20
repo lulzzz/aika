@@ -6,7 +6,7 @@ using System.Text;
 namespace Aika.Elasticsearch.Documents {
     public static class Extensions {
 
-        public static TagDocument ToTagDocument(this ElasticTagDefinition tag) {
+        public static TagDocument ToTagDocument(this ElasticsearchTagDefinition tag) {
             return new TagDocument() {
                 Id = tag.IdAsGuid,
                 Name = tag.Name,
@@ -26,7 +26,13 @@ namespace Aika.Elasticsearch.Documents {
                     Limit = tag.DataFilter.CompressionFilter.Settings.Limit,
                     WindowSize = tag.DataFilter.CompressionFilter.Settings.WindowSize
                 },
-                Security = tag.Security?.ToArray()
+                Security = tag.Security?.ToArray(),
+                Metadata = new TagDocument.TagMetadata() {
+                    UtcCreatedAt = tag.Metadata.UtcCreatedAt,
+                    Creator = tag.Metadata.Creator,
+                    UtcLastModifiedAt = tag.Metadata.UtcLastModifiedAt,
+                    LastModifiedBy = tag.Metadata.LastModifiedBy
+                }
             };
         }
 
@@ -54,6 +60,11 @@ namespace Aika.Elasticsearch.Documents {
         }
 
 
+        public static TagMetadata ToTagMetadata(this TagDocument tag) {
+            return new TagMetadata(tag.Metadata?.UtcCreatedAt ?? DateTime.MinValue, tag.Metadata?.Creator, tag.Metadata?.UtcLastModifiedAt, tag.Metadata?.LastModifiedBy);
+        }
+
+
         public static StateSetDocument ToStateSetDocument(this StateSet stateSet) {
             return new StateSetDocument() {
                 Name = stateSet.Name,
@@ -71,7 +82,7 @@ namespace Aika.Elasticsearch.Documents {
         }
 
 
-        public static TagValueDocument ToTagValueDocument(this TagValue value, ElasticTagDefinition tag, Guid? documentId) {
+        public static TagValueDocument ToTagValueDocument(this TagValue value, ElasticsearchTagDefinition tag, Guid? documentId) {
             return new TagValueDocument() {
                 Id = documentId.HasValue 
                     ? documentId.Value 
@@ -89,11 +100,11 @@ namespace Aika.Elasticsearch.Documents {
         }
 
 
-        public static TagValue ToTagValue(this TagValueDocument value, string units) {
-            return new TagValue(value.UtcSampleTime, 
-                                value.NumericValue, 
-                                value.TextValue, 
-                                value.Quality, 
+        public static TagValue ToTagValue(this TagValueDocument value, DateTime? utcSampleTime = null, double? numericValue = null, string textValue = null, TagValueQuality? quality = null, string units = null) {
+            return new TagValue(utcSampleTime ?? value.UtcSampleTime, 
+                                numericValue ?? value.NumericValue, 
+                                textValue ?? value.TextValue, 
+                                quality ?? value.Quality, 
                                 units);
         }
 

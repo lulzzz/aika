@@ -35,6 +35,20 @@ namespace Aika {
 
 
         /// <summary>
+        /// Tests if an aggregate data function is supported by the specified tags.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagNames">The names of the tags to query.</param>
+        /// <param name="dataFunction">The data query function.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A dictionary that maps from tag name to a flag indicating if the tag supports the 
+        /// <paramref name="dataFunction"/>.
+        /// </returns>
+        Task<IDictionary<string, bool>> IsDataQueryFunctionSupported(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, CancellationToken cancellationToken);
+
+
+        /// <summary>
         /// Retrieves snapshot data from the historian.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>

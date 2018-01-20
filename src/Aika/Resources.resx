@@ -139,6 +139,9 @@
   <data name="Error_HistorianStillInitializing" xml:space="preserve">
     <value>The historian is still initializing.</value>
   </data>
+  <data name="Error_IdentityIsRequired" xml:space="preserve">
+    <value>An identity is required.</value>
+  </data>
   <data name="Error_PositivePointCountIsRequired" xml:space="preserve">
     <value>You must specify a point count greater than zero.</value>
   </data>

@@ -14,7 +14,7 @@ namespace Aika.Elasticsearch {
 
         private readonly ILogger _logger;
 
-        private readonly ElasticHistorian _historian;
+        private readonly ElasticsearchHistorian _historian;
 
         private readonly TimeSpan _interval;
 
@@ -31,7 +31,7 @@ namespace Aika.Elasticsearch {
         private readonly CancellationTokenSource _ctSource = new CancellationTokenSource();
 
 
-        internal BackgroundArchiveValuesWriter(ElasticHistorian historian, TimeSpan interval, ILoggerFactory loggerFactory) {
+        internal BackgroundArchiveValuesWriter(ElasticsearchHistorian historian, TimeSpan interval, ILoggerFactory loggerFactory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _logger = loggerFactory?.CreateLogger<BackgroundSnapshotValuesWriter>();
             _interval = interval;
@@ -40,12 +40,12 @@ namespace Aika.Elasticsearch {
         }
         
 
-        internal void WriteValues(ElasticTagDefinition tag, IEnumerable<TagValue> values, TagValue archiveCandidate) {
+        internal void WriteValues(ElasticsearchTagDefinition tag, IEnumerable<TagValue> values, TagValue archiveCandidate) {
             _valuesLock.EnterReadLock();
             try {
                 foreach (var value in values ?? new TagValue[0]) {
                     var op = new BulkIndexOperation<TagValueDocument>(value.ToTagValueDocument(tag, null)) {
-                        Index = DocumentMappings.GetIndexNameForArchiveTagValue(ElasticHistorian.ArchiveIndexNamePrefix, value.UtcSampleTime)
+                        Index = DocumentMappings.GetIndexNameForArchiveTagValue(ElasticsearchHistorian.ArchiveIndexNamePrefix, value.UtcSampleTime)
                     };
                     _nextInsert.AddOperation(op);
                 }
@@ -92,7 +92,7 @@ namespace Aika.Elasticsearch {
                     }
 
                     var op = new BulkIndexOperation<TagValueDocument>(item.Value.ToTagValueDocument(tag, tag.IdAsGuid)) {
-                        Index = ElasticHistorian.ArchiveCandidatesIndexName
+                        Index = ElasticsearchHistorian.ArchiveCandidatesIndexName
                     };
                     descriptor.AddOperation(op);
                     dirty = true;

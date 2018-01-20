@@ -40,7 +40,7 @@ namespace Aika {
         public TagChangeHistoryEntry(Guid id, DateTime utcTime, string user, string description) {
             Id = id;
             UtcTime = utcTime;
-            User = user;
+            User = user ?? "<UNKNOWN>";
             Description = description;
         }
 

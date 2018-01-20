@@ -7,7 +7,7 @@ namespace Aika {
     /// <summary>
     /// Describes a tag value at a single point in time.
     /// </summary>
-    public class TagValue {
+    public class TagValue : IEquatable<TagValue> {
 
         /// <summary>
         /// Gets the UTC sample time for the value.
@@ -76,5 +76,46 @@ namespace Aika {
             return new TagValue(utcSampleTime, Double.NaN, Resources.TagValue_Unauthorized, TagValueQuality.Bad, null);
         }
 
+
+        /// <summary>
+        /// Returns the hash code for this instance.
+        /// </summary>
+        /// <returns>
+        /// The hash code.
+        /// </returns>
+        public override int GetHashCode() {
+            return UtcSampleTime.GetHashCode();
+        }
+
+
+        /// <summary>
+        /// Tests if the specified object is equal to this instance.
+        /// </summary>
+        /// <param name="obj">The object to test.</param>
+        /// <returns>
+        /// <see langword="true"/> if the objects are equal; otherwise, <see langword="false"/>.
+        /// </returns>
+        public override bool Equals(object obj) {
+            return Equals(obj as TagValue);
+        }
+
+
+        /// <summary>
+        /// Tests if the specified tag value is equal to this instance.
+        /// </summary>
+        /// <param name="other">The object to test.</param>
+        /// <returns>
+        /// <see langword="true"/> if the objects are equal; otherwise, <see langword="false"/>.
+        /// </returns>
+        public bool Equals(TagValue other) {
+            if (other == null) {
+                return false;
+            }
+
+            return UtcSampleTime == other.UtcSampleTime &&
+                   NumericValue == other.NumericValue &&
+                   TextValue == other.TextValue
+                   && Quality == other.Quality;
+        }
     }
 }

@@ -26,6 +26,35 @@ namespace Aika.Elasticsearch.Documents {
 
         public TagSecurity[] Security { get; set; }
 
+        public TagMetadata Metadata { get; set; }
+
+
+        /// <summary>
+        /// Metadata for tag documents.
+        /// </summary>
+        public class TagMetadata {
+
+            /// <summary>
+            /// Gets the UTC creation time for the tag.
+            /// </summary>
+            public DateTime UtcCreatedAt { get; set; }
+
+            /// <summary>
+            /// Gets the identity of the tag's creator.
+            /// </summary>
+            public string Creator { get; set; }
+
+            /// <summary>
+            /// Gets the UTC last-modified time for the tag.
+            /// </summary>
+            public DateTime UtcLastModifiedAt { get; set; }
+
+            /// <summary>
+            /// Gets the identity of the tag's last modifier.
+            /// </summary>
+            public string LastModifiedBy { get; set; }
+        }
+
     }
 
 }

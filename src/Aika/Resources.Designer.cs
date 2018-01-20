@@ -124,6 +124,15 @@ namespace Aika {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to An identity is required..
+        /// </summary>
+        internal static string Error_IdentityIsRequired {
+            get {
+                return ResourceManager.GetString("Error_IdentityIsRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to You must specify a point count greater than zero..
         /// </summary>
         internal static string Error_PositivePointCountIsRequired {

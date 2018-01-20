@@ -7,16 +7,16 @@ using System.Threading.Tasks;
 
 namespace Aika.Elasticsearch
 {
-    public class ElasticTagDefinition : TagDefinition {
+    public class ElasticsearchTagDefinition : TagDefinition {
 
-        private readonly ElasticHistorian _historian;
+        private readonly ElasticsearchHistorian _historian;
 
         internal Guid IdAsGuid { get; }
 
         internal IEnumerable<TagSecurity> Security { get; }
 
 
-        internal ElasticTagDefinition(ElasticHistorian historian, Guid id, TagSettings settings, IEnumerable<TagSecurity> security, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) : base(historian, id.ToString(), settings, initialTagValues, changeHistory) {
+        internal ElasticsearchTagDefinition(ElasticsearchHistorian historian, Guid id, TagSettings settings, TagMetadata metadata, IEnumerable<TagSecurity> security, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) : base(historian, id.ToString(), settings, metadata, initialTagValues, changeHistory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             IdAsGuid = id;
             Security = security?.ToArray() ?? new TagSecurity[0];

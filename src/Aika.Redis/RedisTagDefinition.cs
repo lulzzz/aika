@@ -70,9 +70,10 @@ namespace Aika.Redis {
         /// <param name="historian">The owning historian.</param>
         /// <param name="id">The tag ID.</param>
         /// <param name="settings">The tag settings.</param>
+        /// <param name="metadata">The metadata for the tag.</param>
         /// <param name="initialTagValues">The initial tag values, used to prime the exception and compression filters for the tag.</param>
         /// <param name="changeHistory">The change history for the tag.</param>
-        private RedisTagDefinition(RedisHistorian historian, string id, TagSettings settings, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) : base(historian, id, settings, initialTagValues, changeHistory) {
+        private RedisTagDefinition(RedisHistorian historian, string id, TagSettings settings, TagMetadata metadata, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) : base(historian, id, settings, metadata, initialTagValues, changeHistory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _tagDefinitionKey = _historian.GetKeyForTagDefinition(Id);
             _snapshotKey = _historian.GetKeyForSnapshotData(Id);
@@ -175,7 +176,7 @@ namespace Aika.Redis {
         /// </returns>
         internal static async Task<RedisTagDefinition> Create(RedisHistorian historian, TagSettings settings, ClaimsPrincipal creator, CancellationToken cancellationToken) {
             var now = DateTime.UtcNow;
-            var result = new RedisTagDefinition(historian, null, settings, null, new[] { TagChangeHistoryEntry.Created(creator) });
+            var result = new RedisTagDefinition(historian, null, settings, new TagMetadata(DateTime.UtcNow, creator?.Identity.Name), null, new[] { TagChangeHistoryEntry.Created(creator) });
             var key = historian.GetKeyForTagIdsList();
             
             await Task.WhenAny(Task.WhenAll(result.Save(cancellationToken), historian.Connection.GetDatabase().ListRightPushAsync(key, result.Id)), Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
@@ -211,6 +212,10 @@ namespace Aika.Redis {
                                        new HashEntry("COM_LIMIT_TYPE", (int) DataFilter.CompressionFilter.Settings.LimitType),
                                        new HashEntry("COM_LIMIT", DataFilter.CompressionFilter.Settings.Limit),
                                        new HashEntry("COM_WINDOW", DataFilter.CompressionFilter.Settings.WindowSize.ToString()),
+                                       new HashEntry("MD_CREATEDAT", Metadata.UtcCreatedAt.Ticks),
+                                       new HashEntry("MD_CREATOR", Metadata.Creator),
+                                       new HashEntry("MD_MODIFIEDAT", Metadata.UtcLastModifiedAt.Ticks),
+                                       new HashEntry("MD_MODIFIEDBY", Metadata.LastModifiedBy)
                                    });
 
             await Task.WhenAny(t, Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
@@ -246,6 +251,11 @@ namespace Aika.Redis {
             TagValueFilterDeviationType compressionFilterLimitType = default(TagValueFilterDeviationType);
             double compressionFilterLimit = 0;
             TimeSpan compressionFilterWindowSize = default(TimeSpan);
+
+            DateTime createdAt = DateTime.MinValue;
+            string creator = null;
+            DateTime modifiedAt = DateTime.MinValue;
+            string modifiedBy = null;
 
             foreach (var item in values) {
                 switch (item.Name.ToString()) {
@@ -288,6 +298,18 @@ namespace Aika.Redis {
                     case "COM_WINDOW":
                         compressionFilterWindowSize = TimeSpan.Parse(item.Value);
                         break;
+                    case "MD_CREATEDAT":
+                        createdAt = new DateTime((long) item.Value, DateTimeKind.Utc);
+                        break;
+                    case "MD_CREATEDBY":
+                        creator = item.Value;
+                        break;
+                    case "MD_MODIFIEDAT":
+                        modifiedAt = new DateTime((long) item.Value, DateTimeKind.Utc);
+                        break;
+                    case "MD_MODIFIEDBY":
+                        modifiedBy = item.Value;
+                        break;
                 }
             }
 
@@ -315,6 +337,8 @@ namespace Aika.Redis {
                 }
             };
 
+            var metadata = new TagMetadata(createdAt, creator, modifiedAt, modifiedBy);
+
             var snapshotTask = LoadSnapshotValue(historian, tagId, cancellationToken);
             var lastArchivedTask = LoadLastArchivedValue(historian, tagId, cancellationToken);
             var archiveCandidateTask = LoadArchiveCandidateValue(historian, tagId, cancellationToken);
@@ -327,6 +351,7 @@ namespace Aika.Redis {
             var result = new RedisTagDefinition(historian,
                                                 tagId,
                                                 settings,
+                                                metadata,
                                                 initialValues,
                                                 null);
 
