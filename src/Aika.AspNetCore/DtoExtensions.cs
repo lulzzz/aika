@@ -183,7 +183,13 @@ namespace Aika.AspNetCore {
                     User = x.User,
                     Description = x.Description
                 }).ToArray(),
-                Properties = new Dictionary<string, object>(tagDefinition.GetProperties())
+                Properties = new Dictionary<string, object>(tagDefinition.GetProperties()),
+                Metadata = new TagMetadataDto() {
+                    Creator = tagDefinition.Metadata.Creator,
+                    LastModifiedBy = tagDefinition.Metadata.LastModifiedBy,
+                    UtcCreatedAt = tagDefinition.Metadata.UtcCreatedAt,
+                    UtcLastModifiedAt = tagDefinition.Metadata.UtcLastModifiedAt
+                }
             };
         }
 

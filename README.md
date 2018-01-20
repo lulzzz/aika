@@ -7,6 +7,7 @@ Aika delegates the actual historian functionality to a back-end class implementi
 
 * [In-memory data storage](https://github.com/wazzamatazz/aika/tree/master/src/Aika.InMemoryHistorian)
 * [Redis](https://github.com/wazzamatazz/aika/tree/master/src/Aika.Redis)
+* [Elasticsearch](https://github.com/wazzamatazz/aika/tree/master/src/Aika.Elasticsearch)
 
 The repository also includes an ASP.NET Core 2.0 project that exposes Web API controllers for querying, writing to, and configuring historian tags; SignalR is used to manage real-time data subscriptions, so that subscribers can receive changes in value as soon as they are recorded.
 

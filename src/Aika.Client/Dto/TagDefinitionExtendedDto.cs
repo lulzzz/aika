@@ -22,6 +22,11 @@ namespace Aika.Client.Dto {
         public TagValueFilterSettingsDto CompressionFilterSettings { get; set; }
 
         /// <summary>
+        /// Gets or sets the metadata for the tag.
+        /// </summary>
+        public TagMetadataDto Metadata { get; set; }
+
+        /// <summary>
         /// Gets or sets the change history information for the tag.
         /// </summary>
         public TagChangeHistoryEntryDto[] ChangeHistory { get; set; }
