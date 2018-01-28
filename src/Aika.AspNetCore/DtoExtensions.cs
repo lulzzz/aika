@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Aika.Client.Dto;
+using Aika.StateSets;
+using Aika.Tags;
 
 namespace Aika.AspNetCore {
     internal static class DtoExtensions {
@@ -250,7 +252,7 @@ namespace Aika.AspNetCore {
         }
 
 
-        internal static TagCompressionFilterResultDto ToTagCompressionFilterResultDto(this CompressionFilterResult result, TagDefinition tag) {
+        internal static TagCompressionFilterResultDto ToTagCompressionFilterResultDto(this DataFilters.CompressionFilterResult result, TagDefinition tag) {
             if (result == null) {
                 return null;
             }
@@ -293,7 +295,7 @@ namespace Aika.AspNetCore {
         }
 
 
-        internal static TagExceptionFilterResultDto ToTagExceptionFilterResultDto(this ExceptionFilterResult result, TagDefinition tag) {
+        internal static TagExceptionFilterResultDto ToTagExceptionFilterResultDto(this DataFilters.ExceptionFilterResult result, TagDefinition tag) {
             if (result == null) {
                 return null;
             }

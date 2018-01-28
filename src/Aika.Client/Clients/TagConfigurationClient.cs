@@ -28,23 +28,6 @@ namespace Aika.Client.Clients {
 
 
         /// <summary>
-        /// Gets the total number of tags defined in the historian, if supported by Aika's underlying 
-        /// historian implementation.  Authorized using the <c>aika:managetags</c> authorization policy.
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// A task that will return the number of tags in the historian, if available.
-        /// </returns>
-        public async Task<int?> GetTagCount(CancellationToken cancellationToken) {
-            const string url = "api/configuration/tags/count";
-            var response = await _client.GetAsync(url, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-
-            return await response.Content.ReadAsJsonAsync<int?>(cancellationToken).ConfigureAwait(false);
-        }
-
-
-        /// <summary>
         /// Performs a tag search and returns extended information about the matching tags.  Authorized 
         /// using the <c>aika:managetags</c> authorization policy.
         /// </summary>

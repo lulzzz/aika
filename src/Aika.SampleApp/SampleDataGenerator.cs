@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Aika.AspNetCore;
+using Aika.StateSets;
+using Aika.Tags;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -131,7 +133,7 @@ namespace Aika.SampleApp {
                 return 50f * (Math.Sin(2 * Math.PI * (1 / period) * (time % period)));
             };
 
-            var sinusoid = tags.FirstOrDefault(x => x.Name.Equals("Sinusoid", StringComparison.OrdinalIgnoreCase));
+            var sinusoid = tags.Values.FirstOrDefault(x => x.Name.Equals("Sinusoid", StringComparison.OrdinalIgnoreCase));
             if (sinusoid == null) {
                 sinusoid = await _historian.CreateTag(identity,
                                                 new TagSettings() {
@@ -157,7 +159,7 @@ namespace Aika.SampleApp {
                 start = sinusoid.SnapshotValue.UtcSampleTime.Add(TimeSpan.FromSeconds(5));
             }
 
-            var runningState = tags.FirstOrDefault(x => x.Name.Equals("Running_State", StringComparison.OrdinalIgnoreCase));
+            var runningState = tags.Values.FirstOrDefault(x => x.Name.Equals("Running_State", StringComparison.OrdinalIgnoreCase));
             if (runningState == null) {
                 runningState = await _historian.CreateTag(identity,
                                                 new TagSettings() {

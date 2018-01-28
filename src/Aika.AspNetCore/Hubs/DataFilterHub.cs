@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Aika.Client.Dto;
+using Aika.DataFilters;
+using Aika.Tags;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -87,7 +89,7 @@ namespace Aika.AspNetCore.Hubs {
             }
 
             var tags = await _historian.GetTags(Context.User, notSubscribed, Context.Connection.ConnectionAbortedToken).ConfigureAwait(false);
-            foreach (var tag in tags) {
+            foreach (var tag in tags.Values) {
                 subscriptions.GetOrAdd(tag, t => {
                     var exceptionFilterHander = GetExceptionFilterValueProcessedHandler(t);
                     var compressionFilterHander = GetCompressionFilterValueProcessedHandler(t);

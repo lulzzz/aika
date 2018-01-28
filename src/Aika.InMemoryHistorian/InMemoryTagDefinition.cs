@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Aika;
+using Aika.Tags;
+using Aika.Tags.Security;
 using Microsoft.Extensions.Logging;
 
 namespace Aika.Historians {
@@ -16,8 +18,26 @@ namespace Aika.Historians {
         internal ConcurrentDictionary<string, object> Properties { get; } = new ConcurrentDictionary<string, object>();
 
 
-        internal InMemoryTagDefinition(InMemoryHistorian historian, string id, TagSettings tagSettings, TagMetadata metadata) : base(historian, id, tagSettings, metadata, null, null) {
+        internal InMemoryTagDefinition(InMemoryHistorian historian, string id, TagSettings tagSettings, TagMetadata metadata) : base(historian, id, tagSettings, metadata, CreateTagSecurity(), null, null) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
+        }
+
+
+        private static TagSecurity CreateTagSecurity() {
+            return new TagSecurity(null, new Dictionary<string, TagSecurityPolicy>() {
+                {
+                    TagSecurityPolicy.Administrator,
+                    new TagSecurityPolicy(new [] { new TagSecurityEntry(null, "*") }, null)
+                },
+                {
+                    TagSecurityPolicy.DataRead,
+                    new TagSecurityPolicy(new [] { new TagSecurityEntry(null, "*") }, null)
+                },
+                {
+                    TagSecurityPolicy.DataWrite,
+                    new TagSecurityPolicy(new [] { new TagSecurityEntry(null, "*") }, null)
+                }
+            });
         }
 
 

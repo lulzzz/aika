@@ -6,6 +6,8 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Aika.Tags;
+using Aika.Tags.Security;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 
@@ -73,7 +75,7 @@ namespace Aika.Redis {
         /// <param name="metadata">The metadata for the tag.</param>
         /// <param name="initialTagValues">The initial tag values, used to prime the exception and compression filters for the tag.</param>
         /// <param name="changeHistory">The change history for the tag.</param>
-        private RedisTagDefinition(RedisHistorian historian, string id, TagSettings settings, TagMetadata metadata, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) : base(historian, id, settings, metadata, initialTagValues, changeHistory) {
+        private RedisTagDefinition(RedisHistorian historian, string id, TagSettings settings, TagMetadata metadata, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) : base(historian, id, settings, metadata, CreateTagSecurity(), initialTagValues, changeHistory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _tagDefinitionKey = _historian.GetKeyForTagDefinition(Id);
             _snapshotKey = _historian.GetKeyForSnapshotData(Id);
@@ -83,6 +85,24 @@ namespace Aika.Redis {
             _archiveCandidateValue = initialTagValues?.NextArchiveCandidateValue;
 
             Updated += TagUpdated;
+        }
+
+
+        private static TagSecurity CreateTagSecurity() {
+            return new TagSecurity(null, new Dictionary<string, TagSecurityPolicy>() {
+                {
+                    TagSecurityPolicy.Administrator,
+                    new TagSecurityPolicy(new [] { new TagSecurityEntry(null, "*") }, null)
+                },
+                {
+                    TagSecurityPolicy.DataRead,
+                    new TagSecurityPolicy(new [] { new TagSecurityEntry(null, "*") }, null)
+                },
+                {
+                    TagSecurityPolicy.DataWrite,
+                    new TagSecurityPolicy(new [] { new TagSecurityEntry(null, "*") }, null)
+                }
+            });
         }
 
 

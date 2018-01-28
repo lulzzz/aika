@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Aika.Tags;
 
 namespace Aika {
     /// <summary>
@@ -78,7 +79,7 @@ namespace Aika {
             }
 
             var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
-            foreach (var item in tags) {
+            foreach (var item in tags.Values) {
                 if (!_subscribedTags.TryAdd(item.Id, item)) {
                     continue;
                 }
@@ -134,7 +135,7 @@ namespace Aika {
             }
 
             var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
-            foreach (var item in tags) {
+            foreach (var item in tags.Values) {
                 UnsubscribeTag(item);
             }
         }

@@ -6,6 +6,8 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Aika.StateSets;
+using Aika.Tags;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -37,37 +39,15 @@ namespace Aika.Redis {
         internal IConnectionMultiplexer Connection { get; private set; }
 
         /// <summary>
-        /// Flags if the historian is initialised.
-        /// </summary>
-        private bool _isInitialized;
-
-        /// <summary>
         /// Flags if the historian is initialising.
         /// </summary>
         private bool _isInitializing;
-
-        /// <summary>
-        /// gets a flag that indicates if the historian has finished initializing.
-        /// </summary>
-        public override bool IsInitialized { get { return _isInitialized; } }
 
         /// <summary>
         /// Gets the historian description.
         /// </summary>
         public override string Description {
             get { return Resources.Description; }
-        }
-
-        /// <summary>
-        /// The historian properties.
-        /// </summary>
-        private readonly ConcurrentDictionary<string, object> _properties = new ConcurrentDictionary<string, object>();
-
-        /// <summary>
-        /// Gets the historian properties.
-        /// </summary>
-        public override IDictionary<string, object> Properties {
-            get { return _properties.ToDictionary(x => x.Key, x => x.Value); }
         }
 
         /// <summary>
@@ -126,19 +106,15 @@ namespace Aika.Redis {
         /// <returns>
         /// A task that will initialize the historian.
         /// </returns>
-        public override async Task Init(CancellationToken cancellationToken) {
-            if (_isInitialized || _isInitializing) {
-                return;
-            }
-
+        protected override async Task Init(CancellationToken cancellationToken) {
             void onConnected(object sender, ConnectionFailedEventArgs args) {
                 _logger?.LogInformation($"Redis connection established: {args.EndPoint} (Connection Type = {args.ConnectionType})");
-                _properties[Resources.Properties_Connected] = Connection.IsConnected;
+                Properties[Resources.Properties_Connected] = Connection.IsConnected;
             };
 
             void onConnectionFailed(object sender, ConnectionFailedEventArgs args) {
                 _logger?.LogError($"Redis connection failed: {args.EndPoint} (Connection Type = {args.ConnectionType}, Failure Type = {args.FailureType}).", args.Exception);
-                _properties[Resources.Properties_Connected] = Connection.IsConnected;
+                Properties[Resources.Properties_Connected] = Connection.IsConnected;
             };
 
             try {
@@ -150,13 +126,11 @@ namespace Aika.Redis {
                 Connection.ConnectionRestored += onConnected;
                 Connection.ConnectionFailed += onConnectionFailed;
 
-                _properties[Resources.Properties_Connected] = Connection.IsConnected;
+                Properties[Resources.Properties_Connected] = Connection.IsConnected;
 
                 // Load state sets first so that they are already loaded when we start loading tags.
                 await RedisStateSet.LoadAll(this, stateSet => _stateSets[stateSet.Name] = stateSet, cancellationToken).ConfigureAwait(false);
                 await RedisTagDefinition.LoadAll(this, tag => _tags[tag.Id] = tag, cancellationToken).ConfigureAwait(false);
-
-                _isInitialized = true;
             }
             catch {
                 if (Connection != null) {
@@ -184,7 +158,7 @@ namespace Aika.Redis {
         /// <returns>
         /// A collection of matching tags.
         /// </returns>
-        public override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+        protected override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
             IEnumerable<TagDefinition> allTags = _tags.Values;
             var result = filter.FilterType == TagDefinitionFilterJoinType.And
                 ? (IEnumerable<TagDefinition>) _tags.Values
@@ -236,34 +210,29 @@ namespace Aika.Redis {
         /// <returns>
         /// The definitions of the requested tags.
         /// </returns>
-        public override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
-            var result = _tags.Values.Where(x => tagIdsOrNames.Any(n => String.Equals(n, x.Id, StringComparison.OrdinalIgnoreCase) || String.Equals(n, x.Name, StringComparison.OrdinalIgnoreCase)));
-            return Task.FromResult<IEnumerable<TagDefinition>>(result.ToArray());
+        protected override Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
+            var result = new Dictionary<string, TagDefinition>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in tagIdsOrNames) {
+                if (String.IsNullOrWhiteSpace(item)) {
+                    continue;
+                }
+
+                if (_tags.TryGetValue(item, out var tag)) {
+                    result[item] = tag;
+                    continue;
+                }
+
+                tag = _tags.Values.FirstOrDefault(x => String.Equals(item, x.Name, StringComparison.OrdinalIgnoreCase));
+                if (tag != null) {
+                    result[item] = tag;
+                }
+            }
+            return Task.FromResult<IDictionary<string, TagDefinition>>(result);
         }
 
         #endregion
 
         #region [ Read Tag Data ]
-
-        /// <summary>
-        /// Tests if the calling identity is allowed to read data from the specified tag names.
-        /// </summary>
-        /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagNames">The tag names.</param>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// A dictionary that maps from tag name to authorization result.
-        /// </returns>
-        public override Task<IDictionary<string, bool>> CanReadTagData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var result = new Dictionary<string, bool>();
-
-            foreach (var item in tagNames) {
-                result[item] = true;
-            }
-
-            return Task.FromResult<IDictionary<string, bool>>(result);
-        }
-
 
         /// <summary>
         /// Gets the data query functions supported by the historian.
@@ -272,32 +241,8 @@ namespace Aika.Redis {
         /// <returns>
         /// A collection of data query functions.  Common functions are defined in the <see cref="DataQueryFunction"/> class.
         /// </returns>
-        public override Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
+        protected override Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
             return Task.FromResult<IEnumerable<DataQueryFunction>>(new DataQueryFunction[0]);
-        }
-
-
-        /// <summary>
-        /// Retrieves snapshot data from the historian.
-        /// </summary>
-        /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagNames">The names of the tags to query.</param>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// A dictionary of snapshot values, indexed by tag name.
-        /// </returns>
-        public override Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var result = new Dictionary<string, TagValue>(StringComparer.OrdinalIgnoreCase);
-            var tags = _tags.Values.Where(x => tagNames.Contains(x.Name, StringComparer.OrdinalIgnoreCase));
-            foreach (var tag in tags) {
-                if (tag.SnapshotValue == null) {
-                    continue;
-                }
-
-                result[tag.Name] = tag.SnapshotValue;
-            }
-
-            return Task.FromResult<IDictionary<string, TagValue>>(result);
         }
 
 
@@ -305,7 +250,7 @@ namespace Aika.Redis {
         /// Reads raw, unprocessed tag data.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagNames">The names of the tags to query.</param>
+        /// <param name="tags">The tags to query.</param>
         /// <param name="utcStartTime">The UTC start time for the query.</param>
         /// <param name="utcEndTime">The UTC end time for the query.</param>
         /// <param name="pointCount">
@@ -316,15 +261,19 @@ namespace Aika.Redis {
         /// </param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// A dictionary of historical data, indexed by tag name.
+        /// A dictionary of historical data, indexed by tag.
         /// </returns>
-        public override async Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
-            var result = new ConcurrentDictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
-            var tags = _tags.Values.Where(x => tagNames.Contains(x.Name, StringComparer.OrdinalIgnoreCase));
+        protected override async Task<IDictionary<TagDefinition, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
+            
+            var tasks = tags.Select(t => Task.Run(async () => {
+                var tag = t as RedisTagDefinition;
+                if (tag == null) {
+                    return;
+                }
 
-            var tasks = tags.Select(tag => Task.Run(async () => {
                 var vals = await tag.GetRawValues(utcStartTime, utcEndTime, pointCount, cancellationToken).ConfigureAwait(false);
-                result[tag.Name] = new TagValueCollection() {
+                result[tag] = new TagValueCollection() {
                     VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
                     Values = vals.ToArray()
                 };
@@ -341,17 +290,17 @@ namespace Aika.Redis {
         /// Performs an aggregated data query on the historian.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagNames">The names of the tags to query.</param>
+        /// <param name="tags">The tags to query.</param>
         /// <param name="dataFunction">The data function specifying the type of aggregation to perform on the data.  See <see cref="DataQueryFunction"/> for common function names.</param>
         /// <param name="utcStartTime">The UTC start time for the query.</param>
         /// <param name="utcEndTime">The UTC end time for the query.</param>
         /// <param name="sampleInterval">The sample interval to use for aggregation.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// A dictionary of historical data, indexed by tag name.
+        /// A dictionary of historical data, indexed by tag.
         /// </returns>
         /// <seealso cref="DataQueryFunction"/>
-        public override Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+        protected override Task<IDictionary<TagDefinition, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
             throw new NotImplementedException();
         }
 
@@ -360,7 +309,7 @@ namespace Aika.Redis {
         /// Performs an aggregated data query on the historian.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagNames">The names of the tags to query.</param>
+        /// <param name="tagNames">The tags to query.</param>
         /// <param name="dataFunction">The data function specifying the type of aggregation to perform on the data.  See <see cref="DataQueryFunction"/> for common function names.</param>
         /// <param name="utcStartTime">The UTC start time for the query.</param>
         /// <param name="utcEndTime">The UTC end time for the query.</param>
@@ -370,53 +319,16 @@ namespace Aika.Redis {
         /// </param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// A dictionary of historical data, indexed by tag name.
+        /// A dictionary of historical data, indexed by tag.
         /// </returns>
         /// <seealso cref="DataQueryFunction"/>
-        public override Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+        protected override Task<IDictionary<TagDefinition, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
             throw new NotImplementedException();
         }
 
         #endregion
 
-        #region [ Write Tag Data ]
-
-        /// <summary>
-        /// Tests if the calling identity is allowed to write data to the specified tag names.
-        /// </summary>
-        /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagNames">The tag names.</param>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// A dictionary that maps from tag name to authorization result.
-        /// </returns>
-        public override Task<IDictionary<string, bool>> CanWriteTagData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var result = new Dictionary<string, bool>();
-
-            foreach (var item in tagNames) {
-                result[item] = true;
-            }
-
-            return Task.FromResult<IDictionary<string, bool>>(result);
-        }
-
-        #endregion
-
         #region [ Tag Management ]
-
-        /// <summary>
-        /// Gets the total number of configured tags.
-        /// </summary>
-        /// <param name="identity">The identity of the caller.</param>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// The total tag count.  Implementations can return <see langword="null"/> if they do not 
-        /// track this number, or if it is impractical to calculate it.
-        /// </returns>
-        public override Task<int?> GetTagCount(ClaimsPrincipal identity, CancellationToken cancellationToken) {
-            return Task.FromResult<int?>(_tags.Count);
-        }
-
 
         /// <summary>
         /// Creates a new tag.
@@ -427,7 +339,7 @@ namespace Aika.Redis {
         /// <returns>
         /// The new tag definition.
         /// </returns>
-        public override async Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagSettings tag, CancellationToken cancellationToken) {
+        protected override async Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagSettings tag, CancellationToken cancellationToken) {
             var tagDefinition = await RedisTagDefinition.Create(this, tag, identity, cancellationToken).ConfigureAwait(false);
             _tags[tagDefinition.Id] = tagDefinition;
 
@@ -439,28 +351,26 @@ namespace Aika.Redis {
         /// Updates a tag.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagId">The ID of the tag to update.</param>
+        /// <param name="tag">The tag to update.</param>
         /// <param name="update">The updated tag definition.</param>
         /// <param name="description">The change description</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// The updated tag definition.
         /// </returns>
-        public override Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, string description, CancellationToken cancellationToken) {
-            if (tagId == null) {
-                throw new ArgumentNullException(nameof(tagId));
+        protected override Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, TagDefinition tag, TagSettings update, string description, CancellationToken cancellationToken) {
+            if (tag == null) {
+                throw new ArgumentNullException(nameof(tag));
             }
             if (update == null) {
                 throw new ArgumentNullException(nameof(update));
             }
 
-            if (!_tags.TryGetValue(tagId, out var tag)) {
-                throw new ArgumentException(Resources.Error_InvalidTagId, nameof(tagId));
+            if (!_tags.ContainsKey(tag.Id)) {
+                throw new ArgumentException(Resources.Error_InvalidTagId, nameof(tag));
             }
 
-            tag.Update(update, identity, description);
-
-            return Task.FromResult<TagDefinition>(tag);
+            return base.UpdateTag(identity, tag, update, description, cancellationToken);
         }
 
 
@@ -473,7 +383,7 @@ namespace Aika.Redis {
         /// <returns>
         /// A flag that indicates if the tag was deleted.
         /// </returns>
-        public override async Task<bool> DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken) {
+        protected override async Task<bool> DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken) {
             if (tagId == null) {
                 throw new ArgumentNullException(nameof(tagId));
             }
@@ -499,7 +409,7 @@ namespace Aika.Redis {
         /// <returns>
         /// The state sets defined by the historian, indexed by set name.
         /// </returns>
-        public override Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {
+        protected override Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {
             if (filter == null) {
                 throw new ArgumentNullException(nameof(filter));
             }
@@ -528,7 +438,7 @@ namespace Aika.Redis {
         /// <returns>
         /// The corresponding <see cref="StateSet"/>.
         /// </returns>
-        public override Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
+        protected override Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
             if (String.IsNullOrWhiteSpace(name) || !_stateSets.TryGetValue(name, out var result)) {
                 return Task.FromResult<StateSet>(null);
             }
@@ -546,7 +456,7 @@ namespace Aika.Redis {
         /// <returns>
         /// A new <see cref="StateSet"/>.
         /// </returns>
-        public override async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
+        protected override async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
             if (settings  == null) {
                 throw new ArgumentNullException(nameof(settings));
             }
@@ -571,7 +481,7 @@ namespace Aika.Redis {
         /// <returns>
         /// The updated <see cref="StateSet"/>.
         /// </returns>
-        public override async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
+        protected override async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
             if (name == null) {
                 throw new ArgumentNullException(nameof(name));
             }
@@ -605,7 +515,7 @@ namespace Aika.Redis {
         /// state set <paramref name="name"/> does not exist.  Delete operations that fail due to 
         /// authorization issues should throw a <see cref="System.Security.SecurityException"/>.
         /// </remarks>
-        public override async Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
+        protected override async Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
             if (name == null) {
                 throw new ArgumentNullException(nameof(name));
             }

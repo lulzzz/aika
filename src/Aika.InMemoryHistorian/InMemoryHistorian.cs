@@ -7,13 +7,15 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Aika;
+using Aika.StateSets;
+using Aika.Tags;
 using Microsoft.Extensions.Logging;
 
 namespace Aika.Historians {
     /// <summary>
     /// <see cref="IHistorian"/> implementation that uses an in-memory data store.
     /// </summary>
-    public sealed class InMemoryHistorian : HistorianBase, ITagDataReader, ITagDataWriter, ITagManager {
+    public sealed class InMemoryHistorian : HistorianBase {
 
         private static readonly ConcurrentDictionary<string, InMemoryTagDefinition> _tags = new ConcurrentDictionary<string, InMemoryTagDefinition>(StringComparer.OrdinalIgnoreCase);
 
@@ -25,42 +27,21 @@ namespace Aika.Historians {
 
         private const int MaxRawSampleCount = 5000;
 
-        public override bool IsInitialized {
-            get { return true; }
-        }
-
 
         public override string Description {
             get { return "In-memory data store."; }
         }
 
 
-        public override IDictionary<string, object> Properties {
-            get { return new Dictionary<string, object>(); }
-        }
-
-
         public InMemoryHistorian(ITaskRunner taskRunner, ILoggerFactory loggerFactory) : base(taskRunner, loggerFactory) { }
 
 
-        public override Task Init(CancellationToken cancellationToken) {
+        protected override Task Init(CancellationToken cancellationToken) {
             return Task.CompletedTask;
         }
 
 
-        public override Task<IDictionary<string, bool>> CanReadTagData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var result = tagNames.ToDictionary(x => x, x => true);
-            return Task.FromResult<IDictionary<string, bool>>(result);
-        }
-
-
-        public override Task<IDictionary<string, bool>> CanWriteTagData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var result = tagNames.ToDictionary(x => x, x => true);
-            return Task.FromResult<IDictionary<string, bool>>(result);
-        }
-
-
-        public override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+        protected override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
             IEnumerable<TagDefinition> allTags = _tags.Values;
             var result = filter.FilterType == TagDefinitionFilterJoinType.And
                 ? (IEnumerable<TagDefinition>) _tags.Values
@@ -103,31 +84,35 @@ namespace Aika.Historians {
         }
 
 
-        public override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var result = _tags.Values.Where(x => tagNames.Any(n => String.Equals(n, x.Id, StringComparison.OrdinalIgnoreCase) || String.Equals(n, x.Name, StringComparison.OrdinalIgnoreCase)));
-            return Task.FromResult<IEnumerable<TagDefinition>>(result.ToArray());
+        protected override Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
+            var result = new Dictionary<string, TagDefinition>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in tagNames) {
+                if (String.IsNullOrWhiteSpace(item)) {
+                    continue;
+                }
+
+                if (_tags.TryGetValue(item, out var tag)) {
+                    result[item] = tag;
+                    continue;
+                }
+
+                tag = _tags.Values.FirstOrDefault(x => String.Equals(item, x.Name, StringComparison.OrdinalIgnoreCase));
+                if (tag != null) {
+                    result[item] = tag;
+                }
+            }
+            return Task.FromResult<IDictionary<string, TagDefinition>>(result);
         }
 
 
-        public override Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
+        protected override Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
             return Task.FromResult<IEnumerable<DataQueryFunction>>(new DataQueryFunction[0]);
         }
 
+        
+        private Task<IDictionary<TagDefinition, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
+            var result = new Dictionary<TagDefinition, TagValueCollection>();
 
-        public override Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var tags = _tags.Values.Where(x => tagNames.Any(n => String.Equals(n, x.Id, StringComparison.OrdinalIgnoreCase) || String.Equals(n, x.Name, StringComparison.OrdinalIgnoreCase)));
-            var result = new Dictionary<string, TagValue>(StringComparer.OrdinalIgnoreCase);
-            foreach (var item in tags) {
-                result[item.Name] = item.SnapshotValue;
-            }
-            return Task.FromResult<IDictionary<string, TagValue>>(result);
-        }
-
-
-        private Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
-            var result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
-
-            var tags = _tags.Values.Where(x => tagNames.Any(n => String.Equals(n, x.Id, StringComparison.OrdinalIgnoreCase) || String.Equals(n, x.Name, StringComparison.OrdinalIgnoreCase)));
             foreach (var tag in tags) {
                 if (!_archive.TryGetValue(tag.Id, out var rawData)) {
                     continue;
@@ -152,7 +137,7 @@ namespace Aika.Historians {
 
                     var selected = rawData.Values.Concat(nonArchiveValues).Where(x => x.UtcSampleTime >= utcStartTime && x.UtcSampleTime <= utcEndTime).Take(take);
 
-                    result[tag.Name] = new TagValueCollection() {
+                    result[tag] = new TagValueCollection() {
                         Values = selected.ToArray(),
                         VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge
                     };
@@ -162,21 +147,21 @@ namespace Aika.Historians {
                 }
             }
 
-            return Task.FromResult<IDictionary<string, TagValueCollection>>(result);
+            return Task.FromResult<IDictionary<TagDefinition, TagValueCollection>>(result);
         }
 
 
-        public override Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
-            return ReadRawData(identity, tagNames, utcStartTime, utcEndTime, TimeSpan.Zero, pointCount, cancellationToken);
+        protected override Task<IDictionary<TagDefinition, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+            return ReadRawData(identity, tags, utcStartTime, utcEndTime, TimeSpan.Zero, pointCount, cancellationToken);
         }
 
 
-        public override Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+        protected override Task<IDictionary<TagDefinition, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
             throw new NotSupportedException();
         }
 
 
-        public override Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+        protected override Task<IDictionary<TagDefinition, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
             throw new NotSupportedException();
         }
 
@@ -254,12 +239,7 @@ namespace Aika.Historians {
         }
 
 
-        public override Task<int?> GetTagCount(ClaimsPrincipal claimsIdentity, CancellationToken cancellationToken) {
-            return Task.FromResult<int?>(_tags.Count);
-        }
-
-
-        public override Task<TagDefinition> CreateTag(ClaimsPrincipal claimsIdentity, TagSettings tag, CancellationToken cancellationToken) {
+        protected override Task<TagDefinition> CreateTag(ClaimsPrincipal claimsIdentity, TagSettings tag, CancellationToken cancellationToken) {
             var result = new InMemoryTagDefinition(this, null, tag, new TagMetadata(DateTime.UtcNow, claimsIdentity?.Identity?.Name));
             _tags[result.Id] = result;
 
@@ -267,17 +247,16 @@ namespace Aika.Historians {
         }
 
 
-        public override Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, string description, CancellationToken cancellationToken) {
-            if (!_tags.TryGetValue(tagId, out var tag)) {
-                throw new ArgumentException($"Could not find tag with ID or name \"{tagId}\".", nameof(tagId));
+        protected override Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, TagDefinition tag, TagSettings update, string description, CancellationToken cancellationToken) {
+            if (!_tags.ContainsKey(tag.Id)) {
+                throw new ArgumentException("Tag is not registered.", nameof(tag));
             }
 
-            tag.Update(update, identity, description);
-            return Task.FromResult<TagDefinition>(tag);
+            return base.UpdateTag(identity, tag, update, description, cancellationToken);
         }
 
 
-        public override Task<bool> DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken) {
+        protected override Task<bool> DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken) {
             var result = false;
 
             if (_tags.TryRemove(tagId, out var tag)) {
@@ -291,7 +270,7 @@ namespace Aika.Historians {
             return Task.FromResult(result);
         }
 
-        public override Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {
+        protected override Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {
             IEnumerable<StateSet> stateSets;
 
             if (String.IsNullOrWhiteSpace(filter.Filter)) {
@@ -306,7 +285,7 @@ namespace Aika.Historians {
             return Task.FromResult<IEnumerable<StateSet>>(result);
         }
 
-        public override Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
+        protected override Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
             if (_stateSets.TryGetValue(name, out var stateSet)) {
                 return Task.FromResult(stateSet);
             }
@@ -314,7 +293,7 @@ namespace Aika.Historians {
             return Task.FromResult<StateSet>(null);
         }
 
-        public override Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
+        protected override Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
             var result = new StateSet(settings.Name, settings.Description, settings.States);
             if (!_stateSets.TryAdd(result.Name, result)) {
                 throw new ArgumentException("A state set with the same name already exists.", nameof(settings));
@@ -323,14 +302,14 @@ namespace Aika.Historians {
             return Task.FromResult(result);
         }
 
-        public override Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
+        protected override Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
             var result = new StateSet(name, settings.Description, settings.States);
             _stateSets[result.Name] = result;
 
             return Task.FromResult(result);
         }
 
-        public override Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
+        protected override Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
             var result = _stateSets.TryRemove(name, out var _);
             return Task.FromResult(result);
         }

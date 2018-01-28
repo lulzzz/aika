@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Aika.Client;
 using Aika.Client.Dto;
+using Aika.Tags;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

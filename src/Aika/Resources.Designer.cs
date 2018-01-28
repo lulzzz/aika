@@ -79,6 +79,15 @@ namespace Aika {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Tag operations cannot be performed on tags owned by another historian..
+        /// </summary>
+        internal static string Error_CannotOperateOnTagsOwnedByAnotherHistorian {
+            get {
+                return ResourceManager.GetString("Error_CannotOperateOnTagsOwnedByAnotherHistorian", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to You must specify a change description..
         /// </summary>
         internal static string Error_ChangeDescriptionIsRequired {
@@ -201,6 +210,15 @@ namespace Aika {
         internal static string Error_TagIdOrNameIsRequired {
             get {
                 return ResourceManager.GetString("Error_TagIdOrNameIsRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The specified tag was not found..
+        /// </summary>
+        internal static string Error_TagNotFound {
+            get {
+                return ResourceManager.GetString("Error_TagNotFound", resourceCulture);
             }
         }
         

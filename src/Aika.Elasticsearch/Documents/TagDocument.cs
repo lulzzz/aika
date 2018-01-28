@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Aika.Tags;
 using Nest;
 
 namespace Aika.Elasticsearch.Documents {
@@ -24,7 +25,7 @@ namespace Aika.Elasticsearch.Documents {
 
         public TagValueFilterSettingsUpdate CompressionFilter { get; set; }
 
-        public TagSecurity[] Security { get; set; }
+        public TagSecurity Security { get; set; }
 
         public TagMetadata Metadata { get; set; }
 
@@ -53,6 +54,32 @@ namespace Aika.Elasticsearch.Documents {
             /// Gets the identity of the tag's last modifier.
             /// </summary>
             public string LastModifiedBy { get; set; }
+        }
+
+
+        public class TagSecurity {
+
+            public string Owner { get; set; }
+
+            public IDictionary<string, TagSecurityPolicy> Policies { get; set; }
+
+        }
+
+
+        public class TagSecurityPolicy {
+
+            public TagSecurityEntry[] Allow { get; set; }
+
+            public TagSecurityEntry[] Deny { get; set; }
+
+        }
+
+        public class TagSecurityEntry {
+
+            public string ClaimType { get; set; }
+
+            public string Value { get; set; }
+
         }
 
     }

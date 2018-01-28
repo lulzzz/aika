@@ -3,10 +3,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Security;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Aika.Elasticsearch.Documents;
+using Aika.StateSets;
+using Aika.Tags;
 using Elasticsearch.Net;
 using Microsoft.Extensions.Logging;
 using Nest;
@@ -18,67 +21,133 @@ namespace Aika.Elasticsearch {
     /// </summary>
     public class ElasticsearchHistorian : HistorianBase {
 
+        #region [ Fields / Properties ]
 
-        public const string TagsIndexName = "aika-tags";
+        /// <summary>
+        /// The default prefix for Elasticsearch indices.
+        /// </summary>
+        public const string DefaultIndexPrefix = "aika-";
 
-        public const string TagChangeHistoryIndexName = "aika-tag-config-history";
+        /// <summary>
+        /// The actual Elasticsearch index prefix used at runtime.
+        /// </summary>
+        private readonly string _indexPrefix;
 
-        public const string StateSetsIndexName = "aika-state-sets";
+        /// <summary>
+        /// Gets the name of the tags index for the historian.
+        /// </summary>
+        public string TagsIndexName { get; }
 
-        public const string SnapshotValuesIndexName = "aika-snapshot";
+        /// <summary>
+        /// Gets the name of the tag change history index for the historian.
+        /// </summary>
+        public string TagChangeHistoryIndexName { get; }
 
-        public const string ArchiveCandidatesIndexName = "aika-archive-temporary";
+        /// <summary>
+        /// Gets the name of the state sets index for the historian.
+        /// </summary>
+        public string StateSetsIndexName { get; }
 
-        public const string ArchiveIndexNamePrefix = "aika-archive-permanent-";
+        /// <summary>
+        /// Gets the name of the snapshot value index for the historian.
+        /// </summary>
+        public string SnapshotValuesIndexName { get; }
 
-        private const string DataQueryIndices = ArchiveIndexNamePrefix + "*," + ArchiveCandidatesIndexName + "," + SnapshotValuesIndexName;
+        /// <summary>
+        /// Gets the name of the archive candidates index for the historian.
+        /// </summary>
+        public string ArchiveCandidatesIndexName { get; }
 
+        /// <summary>
+        /// Gets the prefix for the historian's archive indices.
+        /// </summary>
+        public string ArchiveIndexNamePrefix { get; }
+
+        /// <summary>
+        /// A function for generating the archive index name suffix to use for a tag and sample time 
+        /// combination.
+        /// </summary>
+        internal ArchiveIndexNameSuffixGenerator ArchiveIndexSuffixGenerator { get; }
+
+        /// <summary>
+        /// An index descriptor that is used to search across permanently-archived, archive candidate, 
+        /// and snapshot tag values.
+        /// </summary>
+        private readonly string _dataQueryIndices;
+
+        /// <summary>
+        /// The maximum number of samples that will be requested per tag per Elasticsearch query.
+        /// </summary>
         private const int MaxSamplesPerTagPerQuery = 5000;
 
+        /// <summary>
+        /// The overall maximum number of samples that will be requested per Elasticsearch query.
+        /// </summary>
         private const int MaxSamplesPerQuery = 20000;
 
+        /// <summary>
+        /// The maximum number of tags that will be included in a single Elasticsearch query.
+        /// </summary>
         private const int MaxTagsPerQuery = 100;
 
+        /// <summary>
+        /// ISO date format to use when converting <see cref="DateTime"/> to <see cref="String"/> (e.g. 
+        /// for use in Elasticsearch data queries).
+        /// </summary>
         private const string IsoDateFormat = "yyyy-MM-ddTHH:mm:ss.fffffffZ";
 
-
+        /// <summary>
+        /// Gets the historian description.
+        /// </summary>
         public override string Description {
             get { return Resources.ElasticHistorian_Description; }
         }
 
-        private bool _isInitialized;
-
-        public override bool IsInitialized {
-            get { return _isInitialized; }
-        }
-
-        private readonly ConcurrentDictionary<string, object> _properties = new ConcurrentDictionary<string, object>();
-
-        public override IDictionary<string, object> Properties {
-            get { return _properties; }
-        }
-
+        /// <summary>
+        /// Gets the <see cref="ITaskRunner"/> for the historian.
+        /// </summary>
         internal new ITaskRunner TaskRunner {
             get { return base.TaskRunner; }
         }
 
+        /// <summary>
+        /// Gets the NEST client for querying Elasticsearch.
+        /// </summary>
         internal ElasticClient Client { get; }
 
+        /// <summary>
+        /// Holds tag definitions, indexed by ID.
+        /// </summary>
         private readonly ConcurrentDictionary<string, ElasticsearchTagDefinition> _tagsById = new ConcurrentDictionary<string, ElasticsearchTagDefinition>();
 
+        /// <summary>
+        /// Holds tag definitions, indexed by name.
+        /// </summary>
         private readonly ConcurrentDictionary<string, ElasticsearchTagDefinition> _tagsByName = new ConcurrentDictionary<string, ElasticsearchTagDefinition>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Holds tag state sets, indexed by name,
+        /// </summary>
         private readonly ConcurrentDictionary<string, StateSet> _stateSets = new ConcurrentDictionary<string, StateSet>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
-        /// Holds the archive data index names that are known to exist
+        /// Holds the archive data index names that are known to exist.
         /// </summary>
         private readonly ConcurrentDictionary<string, object> _archiveIndices = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Handles background writing of snapshot values to Elasticsearch.
+        /// </summary>
         private BackgroundSnapshotValuesWriter _snapshotWriter;
 
+        /// <summary>
+        /// Handles background writing of archive values to Elasticsearch.
+        /// </summary>
         private BackgroundArchiveValuesWriter _archiveWriter;
 
+        /// <summary>
+        /// The data query functions supported by the historian.
+        /// </summary>
         private static readonly DataQueryFunction[] DataQueryFunctions = {
             new DataQueryFunction(DataQueryFunction.Average, "Average value calculated over a sample interval."),
             new DataQueryFunction(DataQueryFunction.Interpolated, "Interpolated data."),
@@ -86,22 +155,53 @@ namespace Aika.Elasticsearch {
             new DataQueryFunction(DataQueryFunction.Maximum, "Maximum value over a sample interval.")
         };
 
+        #endregion
 
-        public ElasticsearchHistorian(ITaskRunner taskRunner, ElasticClient client, ILoggerFactory loggerFactory) : base(taskRunner, loggerFactory) {
+        #region [ Constructor ]
+
+        /// <summary>
+        /// Creates a new <see cref="ElasticsearchHistorian"/> object.
+        /// </summary>
+        /// <param name="client">The NEST client to use for Elasticsearch queries.</param>
+        /// <param name="options">The historian options.</param>
+        /// <param name="taskRunner">The <see cref="ITaskRunner"/> to use for running background tasks.</param>
+        /// <param name="loggerFactory">The <see cref="ILoggerFactory"/> to use.</param>
+        public ElasticsearchHistorian(ElasticClient client, Options options, ITaskRunner taskRunner, ILoggerFactory loggerFactory) : base(taskRunner, loggerFactory) {
             Client = client ?? throw new ArgumentNullException(nameof(client));
+            _indexPrefix = String.IsNullOrWhiteSpace(options?.IndexPrefix)
+                ? DefaultIndexPrefix
+                : options.IndexPrefix.Trim();
+            ArchiveIndexSuffixGenerator = options?.GetArchiveIndexSuffix;
+
+            TagsIndexName = _indexPrefix + "tags";
+            TagChangeHistoryIndexName = _indexPrefix + "tag-config-history";
+            StateSetsIndexName = _indexPrefix + "state-sets";
+            SnapshotValuesIndexName = _indexPrefix + "snapshot";
+            ArchiveCandidatesIndexName = _indexPrefix + "archive-temporary";
+            ArchiveIndexNamePrefix = _indexPrefix + "archive-permanent-";
+            _dataQueryIndices = ArchiveIndexNamePrefix + "*," + ArchiveCandidatesIndexName + "," + SnapshotValuesIndexName;
         }
 
+        #endregion
 
-        public override async Task Init(CancellationToken cancellationToken) {
-            if (_isInitialized) {
-                return;
-            }
+        #region [ Initialization and Elasticsearch Index Management ]
 
+        /// <summary>
+        /// Initializes the historian.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will initialize the historian.
+        /// </returns>
+        protected override async Task Init(CancellationToken cancellationToken) {
             _snapshotWriter?.Dispose();
             _archiveWriter?.Dispose();
 
             await CreateFixedIndices(cancellationToken).ConfigureAwait(false);
-            await LoadArchiveIndexNames(cancellationToken).ConfigureAwait(false);
+            await Task.WhenAll(
+                LoadArchiveIndexNames(cancellationToken),
+                LoadStateSetsFromElasticsearch(cancellationToken)
+            ).ConfigureAwait(false);
             await LoadTagsFromElasticsearch(cancellationToken).ConfigureAwait(false);
 
             _snapshotWriter = new BackgroundSnapshotValuesWriter(this, TimeSpan.FromSeconds(2), LoggerFactory);
@@ -109,12 +209,16 @@ namespace Aika.Elasticsearch {
 
             TaskRunner.RunBackgroundTask(ct => _snapshotWriter.Execute(ct));
             TaskRunner.RunBackgroundTask(ct => _archiveWriter.Execute(ct));
-
-            _isInitialized = true;
         }
 
-        #region [ Elasticsearch Index Management and Initialization ]
 
+        /// <summary>
+        /// Ensures that the indices with fixed names (i.e. everything except archive data) exist in Elasticsearch.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will create the fixed indices if required.
+        /// </returns>
         private async Task CreateFixedIndices(CancellationToken cancellationToken) {
             // Make sure that the fixed indices (tag definitions, change history, state sets, snapshot values, and archive candidate values) exist.
             var existsResponse = await Client.IndexExistsAsync(new IndexExistsRequest(TagsIndexName), cancellationToken).ConfigureAwait(false);
@@ -144,7 +248,15 @@ namespace Aika.Elasticsearch {
         }
 
 
+        /// <summary>
+        /// Gets the names of the archive data indices that have been created.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will get the archive data index names and assign them to <see cref="_archiveIndices"/>.
+        /// </returns>
         private async Task LoadArchiveIndexNames(CancellationToken cancellationToken) {
+            _archiveIndices.Clear();
             var response = await Client.GetIndexAsync(ArchiveIndexNamePrefix + "*", null, cancellationToken).ConfigureAwait(false);
             foreach (var item in response.Indices) {
                 _archiveIndices[item.Key] = new object();
@@ -152,8 +264,18 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private async Task CreateArchiveIndex(DateTime utcSampleTime, CancellationToken cancellationToken) {
-            var indexName = DocumentMappings.GetIndexNameForArchiveTagValue(ArchiveIndexNamePrefix, utcSampleTime);
+        /// <summary>
+        /// Creates an archive data index for storing data for a tag with the specified sample time, if 
+        /// required.
+        /// </summary>
+        /// <param name="tag">The tag.</param>
+        /// <param name="utcSampleTime">The UTC sample time of the value that will be archived.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will create the required Elasticsearch index if it does not already exists.
+        /// </returns>
+        private async Task CreateArchiveIndex(ElasticsearchTagDefinition tag, DateTime utcSampleTime, CancellationToken cancellationToken) {
+            var indexName = DocumentMappings.GetIndexNameForArchiveTagValue(ArchiveIndexNamePrefix, tag, utcSampleTime, ArchiveIndexSuffixGenerator);
             if (_archiveIndices.ContainsKey(indexName)) {
                 return;
             }
@@ -165,12 +287,48 @@ namespace Aika.Elasticsearch {
         }
 
 
+        /// <summary>
+        /// Loads all state set definitions from Elasticsearch.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will load the state sets from Elasticsearch.
+        /// </returns>
+        private async Task LoadStateSetsFromElasticsearch(CancellationToken cancellationToken) {
+            const int pageSize = 100;
+            var page = 0;
+
+            _stateSets.Clear();
+
+            var @continue = false;
+            do {
+                ++page;
+                var results = await Client.SearchAsync<StateSetDocument>(x => x.Index(StateSetsIndexName).From((page - 1) * pageSize).Size(pageSize), cancellationToken).ConfigureAwait(false);
+                @continue = results.Hits.Count == pageSize;
+
+                if (results.Hits.Count > 0) {
+                    foreach (var hit in results.Hits) {
+                        var stateSet = hit.Source.ToStateSet();
+                        _stateSets[stateSet.Name] = stateSet;
+                    }
+                }
+            } while (@continue);
+        }
+
+
+        /// <summary>
+        /// Loads all tag definitions from Elasticsearch.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will load tag definitions from Elasticsearch and initialize them.
+        /// </returns>
         private async Task LoadTagsFromElasticsearch(CancellationToken cancellationToken) {
             const int pageSize = 100;
             var page = 0;
 
-            var snapshotValuesTask = LoadSnapshotValuesFromElasticsearch(SnapshotValuesIndexName, cancellationToken);
-            var archiveCandidateValuesTask = LoadSnapshotValuesFromElasticsearch(ArchiveCandidatesIndexName, cancellationToken);
+            var snapshotValuesTask = LoadSnapshotOrArchiveCandidateValuesFromElasticsearch(SnapshotValuesIndexName, cancellationToken);
+            var archiveCandidateValuesTask = LoadSnapshotOrArchiveCandidateValuesFromElasticsearch(ArchiveCandidatesIndexName, cancellationToken);
 
             await Task.WhenAll(snapshotValuesTask, archiveCandidateValuesTask).ConfigureAwait(false);
 
@@ -199,7 +357,7 @@ namespace Aika.Elasticsearch {
                                                                hit.Source.Id,
                                                                settings,
                                                                metadata,
-                                                               hit.Source.Security,
+                                                               hit.Source.Security.ToTagSecurity(),
                                                                new InitialTagValues(snapshot?.ToTagValue(units: settings.Units), lastArchived?.ToTagValue(units: settings.Units), archiveCandidate?.ToTagValue(units: settings.Units)),
                                                                null);
 
@@ -215,7 +373,15 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private async Task<IDictionary<Guid, TagValueDocument>> LoadSnapshotValuesFromElasticsearch(string indexName, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Loads snapshot or archive candidate values for all tags fro Elasticsearch.
+        /// </summary>
+        /// <param name="indexName">The index to load data from.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will return the values indexed by tag ID.
+        /// </returns>
+        private async Task<IDictionary<Guid, TagValueDocument>> LoadSnapshotOrArchiveCandidateValuesFromElasticsearch(string indexName, CancellationToken cancellationToken) {
             const int pageSize = 100;
             var page = 0;
 
@@ -246,9 +412,33 @@ namespace Aika.Elasticsearch {
         }
 
 
+        /// <summary>
+        /// Loads the last-archived value for the specified tag ID.
+        /// </summary>
+        /// <param name="tagId">The tag ID.</param>
+        /// <param name="indexNames">The index names to query for the last-archived value.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will return the last-archived value for the tag.
+        /// </returns>
         private async Task<TagValueDocument> LoadLastArchivedValueFromElasticsearch(Guid tagId, string[] indexNames, CancellationToken cancellationToken) {
             foreach (var index in indexNames) {
-                var response = await Client.SearchAsync<TagValueDocument>(x => x.Index(index).Query(q => q.Term(t => t.TagId, tagId)).Sort(s => s.Descending(f => f.UtcSampleTime)).From(0).Size(1), cancellationToken).ConfigureAwait(false);
+                var response = await Client.SearchAsync<TagValueDocument>(
+                    x => x.Index(index).Query(
+                        q => q.Term(
+                            t => t.TagId, tagId
+                        )
+                    )
+                    .Sort(
+                        s => s.Descending(
+                            f => f.UtcSampleTime
+                        )
+                    )
+                    .From(0)
+                    .Size(1), 
+                    cancellationToken
+                ).ConfigureAwait(false);
+
                 if (response.Hits.Count > 0) {
                     return response.Hits.First().Source;
                 }
@@ -261,7 +451,16 @@ namespace Aika.Elasticsearch {
 
         #region [ State Set Management ]
 
-        public override Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Gets the state sets that match the specified filter.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="filter">The filter to apply.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will return the matching state sets.
+        /// </returns>
+        protected override Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {
             IEnumerable<StateSet> result = _stateSets.Values;
 
             if (!String.IsNullOrWhiteSpace(filter?.Filter)) {
@@ -277,7 +476,16 @@ namespace Aika.Elasticsearch {
         }
 
 
-        public override Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Gets the state set with the specified name.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="name">The name of the state set.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The state set.
+        /// </returns>
+        protected override Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
             if (String.IsNullOrWhiteSpace(name) || !_stateSets.TryGetValue(name, out var result)) {
                 return Task.FromResult<StateSet>(null);
             }
@@ -286,7 +494,16 @@ namespace Aika.Elasticsearch {
         }
 
 
-        public override async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Creates a new state set.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="settings">The state set settings.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The new state set.
+        /// </returns>
+        protected override async Task<StateSet> CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
             if (_stateSets.ContainsKey(settings.Name)) {
                 throw new ArgumentException(Resources.Error_StateSetAlreadyExists, nameof(settings));
             }
@@ -299,7 +516,17 @@ namespace Aika.Elasticsearch {
         }
 
 
-        public override async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Updates a state set.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="name">The state set name.</param>
+        /// <param name="settings">The updated state set settings.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The updated state set.
+        /// </returns>
+        protected override async Task<StateSet> UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
             if (!_stateSets.TryGetValue(name, out var existing)) {
                 throw new ArgumentException(Resources.Error_StateSetDoesNotExist, nameof(settings));
             }
@@ -312,7 +539,16 @@ namespace Aika.Elasticsearch {
         }
 
 
-        public override async Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Deletes a state set.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="name">The state set name.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A flag that indicates if the delete was successful.
+        /// </returns>
+        protected override async Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
             if (!_stateSets.TryGetValue(name, out var value)) {
                 return false;
             }
@@ -326,74 +562,118 @@ namespace Aika.Elasticsearch {
 
         #region [ Tag Management ]
 
-        public override Task<int?> GetTagCount(ClaimsPrincipal identity, CancellationToken cancellationToken) {
-            return Task.FromResult<int?>(_tagsById.Count);
-        }
-
-
-        public override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Performs a tag search.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="filter">The tag search filter.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will return the matching tags.
+        /// </returns>
+        protected override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
             var result = filter?.GetMatchingTags(_tagsById.Values, null) ?? new TagDefinition[0];
             return Task.FromResult(result);
         }
 
 
-        public override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
-            if (tagIdsOrNames == null) {
-                return Task.FromResult<IEnumerable<TagDefinition>>(new TagDefinition[0]);
-            }
+        /// <summary>
+        /// Retrieves tag definitions by ID or name.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagIdsOrNames">The IDs or tag names to retrieve the tag definitions for.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A dictionary of tag definitions, indexed by the items in <paramref name="tagIdsOrNames"/>.
+        /// </returns>
+        protected override Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
+            IDictionary<string, ElasticsearchTagDefinition> result;
 
-            var result = GetTagsByIdOrName(identity, tagIdsOrNames);
-            return Task.FromResult<IEnumerable<TagDefinition>>(result.OrderBy(x => x.Name).ToArray());
+            if (tagIdsOrNames == null) {
+                result = new Dictionary<string, ElasticsearchTagDefinition>();
+            }
+            else {
+                result = GetTagsByIdOrName(identity, tagIdsOrNames);
+            }
+            return Task.FromResult<IDictionary<string, TagDefinition>>(result.ToDictionary(x => x.Key, x => (TagDefinition) x.Value, StringComparer.OrdinalIgnoreCase));
         }
 
 
-        private IEnumerable<ElasticsearchTagDefinition> GetTagsByIdOrName(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames) {
+        /// <summary>
+        /// Retrieves tag definitions by ID or name.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagIdsOrNames">The IDs or tag names to retrieve the tag definitions for.</param>
+        /// <returns>
+        /// A dictionary of tag definitions, indexed by the items in <paramref name="tagIdsOrNames"/>.
+        /// </returns>
+        private IDictionary<string, ElasticsearchTagDefinition> GetTagsByIdOrName(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames) {
             if (tagIdsOrNames == null) {
-                return new ElasticsearchTagDefinition[0];
+                return new Dictionary<string, ElasticsearchTagDefinition>();
             }
 
-            var result = new HashSet<ElasticsearchTagDefinition>();
+            var result = new Dictionary<string, ElasticsearchTagDefinition>(StringComparer.OrdinalIgnoreCase);
             foreach (var item in tagIdsOrNames) {
                 if (_tagsById.TryGetValue(item, out var tag)) {
-                    result.Add(tag);
+                    result[item] = tag;
                 }
                 else if (_tagsByName.TryGetValue(item, out tag)) {
-                    result.Add(tag);
+                    result[item] = tag;
                 }
             }
 
-            return result.OrderBy(x => x.Name).ToArray();
+            return result;
         }
 
 
+        /// <summary>
+        /// Gets the specified tag definition.
+        /// </summary>
+        /// <param name="id">The ID of the tag.</param>
+        /// <returns>The matching tag definition.</returns>
         internal ElasticsearchTagDefinition GetTagById(Guid id) {
             return _tagsById.TryGetValue(id.ToString(), out var tag) ? tag : null;
         }
 
 
-        public override async Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagSettings tag, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Creates a new tag.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tag">The tag settings.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The new tag definition.
+        /// </returns>
+        protected override async Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagSettings tag, CancellationToken cancellationToken) {
             var exists = _tagsByName.ContainsKey(tag.Name);
             if (exists) {
                 throw new ArgumentException(Resources.Error_TagAlreadyExists, nameof(tag));
             }
 
-            TagSecurity security = null;
+            // TODO: allow policies to be passed through, or set default policies via a callback.
+            // Allow read/write by everyone by default.
+            string owner = null;
             if (identity != null) {
                 var idClaim = identity.FindFirst(ClaimTypes.NameIdentifier);
                 if (idClaim != null) {
-                    security = new TagSecurity() {
-                        Policy = "Owner",
-                        Allow = new [] {
-                            new TagSecurityEntry() {
-                                ClaimType = ClaimTypes.NameIdentifier, Value = idClaim.Value
-                            }
-                        }
-                    };
+                    owner = idClaim.Value;
                 }
             }
 
+            Tags.Security.TagSecurity security = new Tags.Security.TagSecurity(owner, new Dictionary<string, Tags.Security.TagSecurityPolicy>() {
+                {
+                    Tags.Security.TagSecurityPolicy.DataRead,
+                    new Tags.Security.TagSecurityPolicy(new [] { new Tags.Security.TagSecurityEntry(null, "*") }, null)
+                },
+                {
+                    Tags.Security.TagSecurityPolicy.DataWrite,
+                    new Tags.Security.TagSecurityPolicy(new [] { new Tags.Security.TagSecurityEntry(null, "*") }, null)
+                }
+            });
+
             var metadata = new TagMetadata(DateTime.UtcNow, identity?.Identity?.Name);
-            var tagDefinition = new ElasticsearchTagDefinition(this, Guid.NewGuid(), tag, metadata, security == null ? null : new[] { security }, null, null);
+            var tagDefinition = new ElasticsearchTagDefinition(this, Guid.NewGuid(), tag, metadata, security, null, null);
 
             await Client.IndexAsync(tagDefinition.ToTagDocument(), x => x.Index(TagsIndexName), cancellationToken).ConfigureAwait(false);
 
@@ -403,9 +683,24 @@ namespace Aika.Elasticsearch {
         }
 
 
-        public override async Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, string tagId, TagSettings update, string description, CancellationToken cancellationToken) {
-            if (!_tagsById.TryGetValue(tagId, out var tag)) {
-                throw new ArgumentException(Resources.Error_TagDoesNotExist, nameof(tagId));
+        /// <summary>
+        /// Updates a tag.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tag">The tag.</param>
+        /// <param name="update">The updated settings.</param>
+        /// <param name="description">A summary description of the update.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The updated tag definition.
+        /// </returns>
+        protected override async Task<TagDefinition> UpdateTag(ClaimsPrincipal identity, TagDefinition tag, TagSettings update, string description, CancellationToken cancellationToken) {
+            if (!_tagsById.TryGetValue(tag.Id, out var esTag)) {
+                throw new ArgumentException(Resources.Error_TagDoesNotExist, nameof(tag));
+            }
+
+            if (!esTag.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.Administrator)) {
+                throw new SecurityException();
             }
 
             var nameChange = !String.IsNullOrWhiteSpace(update.Name) && !tag.Name.Equals(update.Name, StringComparison.OrdinalIgnoreCase);
@@ -413,18 +708,18 @@ namespace Aika.Elasticsearch {
                 throw new ArgumentException(Resources.Error_TagAlreadyExists, nameof(update));
             }
 
-            var oldConfig = tag.ToTagDocument();
+            var oldConfig = esTag.ToTagDocument();
 
-            var change = tag.Update(update, identity, description);
+            var change = esTag.Update(update, identity, description);
             if (nameChange) {
                 _tagsByName.TryRemove(oldConfig.Name, out var _);
-                _tagsByName[tag.Name] = tag;
+                _tagsByName[tag.Name] = esTag;
             }
 
-            await Task.WhenAll(Client.IndexAsync(tag.ToTagDocument(), x => x.Index(TagsIndexName), cancellationToken),
+            await Task.WhenAll(Client.IndexAsync(esTag.ToTagDocument(), x => x.Index(TagsIndexName), cancellationToken),
                                Client.IndexAsync(new TagChangeHistoryDocument() {
                                    Id = change.Id,
-                                   TagId = tag.IdAsGuid,
+                                   TagId = esTag.IdAsGuid,
                                    UtcTime = change.UtcTime,
                                    User = change.User,
                                    Description = change.Description,
@@ -435,9 +730,22 @@ namespace Aika.Elasticsearch {
         }
 
 
-        public override async Task<bool> DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Deletes a tag.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagId">The tag ID.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A flag that indicates in the delete was successful.
+        /// </returns>
+        protected override async Task<bool> DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken) {
             if (!_tagsById.TryGetValue(tagId, out var tag)) {
                 return false;
+            }
+
+            if (!tag.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.Administrator)) {
+                throw new SecurityException();
             }
 
             await Task.WhenAll(
@@ -456,26 +764,26 @@ namespace Aika.Elasticsearch {
 
         #region [ Read Tag Data ]
 
-        public override Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
+        /// <summary>
+        /// Gets the data query functions supported by the historian.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The list of supported data query functions.
+        /// </returns>
+        protected override Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
             return Task.FromResult<IEnumerable<DataQueryFunction>>(DataQueryFunctions);
         }
 
 
-        public override Task<IDictionary<string, bool>> CanReadTagData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var result = tagNames.ToDictionary(x => x, x => true);
-            return Task.FromResult<IDictionary<string, bool>>(result);
-        }
-
-
-        public override async Task<IDictionary<string, TagValue>> ReadSnapshotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            if (tagNames == null) {
-                return new Dictionary<string, TagValue>();
-            }
-            var tags = await GetTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
-            return tags.ToDictionary(x => x.Name, x => x.SnapshotValue);
-        }
-
-
+        /// <summary>
+        /// Converts a <see cref="DateTime"/> into an ISO date string with the same precision used by 
+        /// Elasticsearch.
+        /// </summary>
+        /// <param name="time">The time stamp to convert.</param>
+        /// <returns>
+        /// The converted time stamp.
+        /// </returns>
         private static string GetIsoDateString(DateTime time) {
             return time.ToUniversalTime().ToString(IsoDateFormat, CultureInfo.InvariantCulture);
         }
@@ -500,7 +808,8 @@ namespace Aika.Elasticsearch {
         ///     of samples that the caller wants to return.
         /// </param>
         /// <returns>
-        /// An array of tag groups, where each group is an array of tags.
+        /// An array of tag groups, where each group is an array of tuples, and each tuple contains a 
+        /// tag definition and the key to use in the query results dictionary.
         /// </returns>
         private ElasticsearchTagDefinition[][] GetTagQueryGroups(IEnumerable<ElasticsearchTagDefinition> tags, int expectedSampleCountPerTag) {
             var result = new List<ElasticsearchTagDefinition[]>();
@@ -527,8 +836,19 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private SearchDescriptor<TagValueDocument> AddRawDataQuerySearchDescriptor(SearchDescriptor<TagValueDocument> selector, Guid tagId, string utcStartTime, string utcEndTime, int pointCount) {
-            return selector.Index(DataQueryIndices)
+        /// <summary>
+        /// Adds a query for raw data to an Elasticsearch search descriptor.
+        /// </summary>
+        /// <param name="searchDescriptor">The search descriptor to add the query to.</param>
+        /// <param name="tagId">The ID of the tag to query.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="pointCount">The maximum number of raw samples to return.</param>
+        /// <returns>
+        /// The updated <paramref name="searchDescriptor"/>.
+        /// </returns>
+        private SearchDescriptor<TagValueDocument> AddRawDataQuerySearchDescriptor(SearchDescriptor<TagValueDocument> searchDescriptor, Guid tagId, string utcStartTime, string utcEndTime, int pointCount) {
+            return searchDescriptor.Index(_dataQueryIndices)
                            .Query(
                                query => query.Bool(
                                    q1 => q1.Must(
@@ -547,8 +867,18 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private SearchDescriptor<TagValueDocument> AddPreviousSampleSearchDescriptor(SearchDescriptor<TagValueDocument> selector, Guid tagId, string utcSampleTime) {
-            return selector.Index(DataQueryIndices)
+        /// <summary>
+        /// Adds a query to an Elasticsearch search descriptor that will retrieve the raw sample for 
+        /// a tag prior to the specified time stamp.
+        /// </summary>
+        /// <param name="searchDescriptor">The search descriptor to add the query to.</param>
+        /// <param name="tagId">The ID of the tag to query.</param>
+        /// <param name="utcSampleTime">The UTC sample time to retrieve the previous sample for.</param>
+        /// <returns>
+        /// The updated <paramref name="searchDescriptor"/>.
+        /// </returns>
+        private SearchDescriptor<TagValueDocument> AddPreviousSampleSearchDescriptor(SearchDescriptor<TagValueDocument> searchDescriptor, Guid tagId, string utcSampleTime) {
+            return searchDescriptor.Index(_dataQueryIndices)
                            .Query(
                                query => query.Bool(
                                    q1 => q1.Must(
@@ -565,8 +895,18 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private SearchDescriptor<TagValueDocument> AddNextSampleSearchDescriptor(SearchDescriptor<TagValueDocument> selector, Guid tagId, string utcSampleTime) {
-            return selector.Index(DataQueryIndices)
+        /// <summary>
+        /// Adds a query to an Elasticsearch search descriptor that will retrieve the raw sample for 
+        /// a tag after the specified time stamp.
+        /// </summary>
+        /// <param name="searchDescriptor">The search descriptor to add the query to.</param>
+        /// <param name="tagId">The ID of the tag to query.</param>
+        /// <param name="utcSampleTime">The UTC sample time to retrieve the next sample for.</param>
+        /// <returns>
+        /// The updated <paramref name="searchDescriptor"/>.
+        /// </returns>
+        private SearchDescriptor<TagValueDocument> AddNextSampleSearchDescriptor(SearchDescriptor<TagValueDocument> searchDescriptor, Guid tagId, string utcSampleTime) {
+            return searchDescriptor.Index(_dataQueryIndices)
                            .Query(
                                query => query.Bool(
                                    q1 => q1.Must(
@@ -583,8 +923,18 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private SearchDescriptor<TagValueDocument> AddAggregatedDataQuerySearchDescriptor(SearchDescriptor<TagValueDocument> selector, Guid tagId, string utcStartTime, string utcEndTime) {
-            return selector.Index(DataQueryIndices)
+        /// <summary>
+        /// Adds a query to an Elasticsearch search descriptor that will select the raw values to use in an aggregated data query.
+        /// </summary>
+        /// <param name="searchDescriptor">The search descriptor to add the query to.</param>
+        /// <param name="tagId">The ID of the tag to query.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <returns>
+        /// The updated <paramref name="searchDescriptor"/>.
+        /// </returns>
+        private SearchDescriptor<TagValueDocument> AddAggregatedDataQuerySearchDescriptor(SearchDescriptor<TagValueDocument> searchDescriptor, Guid tagId, string utcStartTime, string utcEndTime) {
+            return searchDescriptor.Index(_dataQueryIndices)
                            .Size(0)
                            .Query(query => query.Bool(
                                     q1 => q1.Must(
@@ -600,13 +950,23 @@ namespace Aika.Elasticsearch {
         }
 
 
-        public override async Task<IDictionary<string, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
-            if (tagNames == null) {
-                return new Dictionary<string, TagValueCollection>();
-            }
-
-            var result = new ConcurrentDictionary<string, TagValueCollection>();
-            var tags = GetTagsByIdOrName(identity, tagNames);
+        /// <summary>
+        /// Performs a raw data query.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="pointCount">
+        ///   The maximum number of raw samples to return.  A value of less than one indicates that all 
+        ///   raw samples in the time range should be returned (up to the limit imposed by the historian).
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The raw data samples, indexed by tag.
+        /// </returns>
+        protected override async Task<IDictionary<TagDefinition, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
 
             var gte = GetIsoDateString(utcStartTime);
             var lte = GetIsoDateString(utcEndTime);
@@ -615,7 +975,7 @@ namespace Aika.Elasticsearch {
                 ? MaxSamplesPerTagPerQuery
                 : pointCount;
 
-            var tagGroups = GetTagQueryGroups(tags, take);
+            var tagGroups = GetTagQueryGroups(tags.OfType<ElasticsearchTagDefinition>(), take);
 
             var queries = tagGroups.Select(grp => ReadRawDataInternal(grp, gte, lte, take, cancellationToken).ContinueWith(t => {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -631,13 +991,28 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private async Task<IDictionary<string, TagValueCollection>> ReadRawDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTime, string utcEndTime, int pointCount, CancellationToken cancellationToken) {
-            var result = new ConcurrentDictionary<string, TagValueCollection>();
+        /// <summary>
+        /// Performs a raw data sub-query on behalf of <see cref="ReadRawData(ClaimsPrincipal, IEnumerable{TagDefinition}, DateTime, DateTime, int, CancellationToken)"/>.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="pointCount">
+        ///   The maximum number of raw samples to return.  A value of less than one indicates that all 
+        ///   raw samples in the time range should be returned (up to the limit imposed by the historian).
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The raw data samples, indexed by tag.
+        /// </returns>
+        private async Task<IDictionary<TagDefinition, TagValueCollection>> ReadRawDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTime, string utcEndTime, int pointCount, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
 
             var multiSearchRequest = new MultiSearchDescriptor();
-            foreach (var tag in tags) {
+            foreach (var item in tags) {
                 multiSearchRequest = multiSearchRequest
-                    .Search<TagValueDocument>(selector => AddRawDataQuerySearchDescriptor(selector, tag.IdAsGuid, utcStartTime, utcEndTime, pointCount));
+                    .Search<TagValueDocument>(selector => AddRawDataQuerySearchDescriptor(selector, item.IdAsGuid, utcStartTime, utcEndTime, pointCount));
             }
 
             var response = await Client.MultiSearchAsync(multiSearchRequest, cancellationToken).ConfigureAwait(false);
@@ -653,7 +1028,7 @@ namespace Aika.Elasticsearch {
                     continue;
                 }
 
-                result[tag.Name] = new TagValueCollection() {
+                result[tag] = new TagValueCollection() {
                     VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
                     Values = item.Documents.Select(x => x.ToTagValue(units: tag.Units)).ToArray()
                 };
@@ -663,22 +1038,49 @@ namespace Aika.Elasticsearch {
         }
 
 
-        public override Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Performs a processed (aggregated) data query.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="dataFunction">The data query function.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="pointCount">
+        ///   The number of samples to return.  This will be used to calculate the bucket size for 
+        ///   data aggregation.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The aggregated data samples, indexed by tag.
+        /// </returns>
+        protected override Task<IDictionary<TagDefinition, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
             if (pointCount < 1) {
                 pointCount = 1;
             }
             var sampleInterval = TimeSpan.FromMilliseconds((utcEndTime - utcStartTime).TotalMilliseconds / pointCount);
-            return ReadProcessedData(identity, tagNames, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
+            return ReadProcessedData(identity, tags, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
         }
 
 
-        public override async Task<IDictionary<string, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<string> tagNames, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
-            if (tagNames == null) {
-                return new Dictionary<string, TagValueCollection>();
-            }
-
-            var result = new ConcurrentDictionary<string, TagValueCollection>();
-            var tags = GetTagsByIdOrName(identity, tagNames);
+        /// <summary>
+        /// Performs a processed (aggregated) data sub-query on behalf of <see cref="ReadProcessedData(ClaimsPrincipal, IEnumerable{TagDefinition}, string, DateTime, DateTime, int, CancellationToken)"/>.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="dataFunction">The data query function.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="pointCount">
+        ///   The number of samples to return.  This will be used to calculate the bucket size for 
+        ///   data aggregation.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The aggregated data samples, indexed by tag.
+        /// </returns>
+        protected override async Task<IDictionary<TagDefinition, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
 
             if (!DataQueryFunction.Interpolated.Equals(dataFunction, StringComparison.OrdinalIgnoreCase)) {
                 // Move the start time back by one interval so that we get a result at the start time that 
@@ -697,9 +1099,9 @@ namespace Aika.Elasticsearch {
             var gte = GetIsoDateString(utcStartTime);
             var lte = GetIsoDateString(utcEndTime);
 
-            var tagGroups = GetTagQueryGroups(tags, pointCount);
+            var tagGroups = GetTagQueryGroups(tags.OfType<ElasticsearchTagDefinition>(), pointCount);
 
-            IEnumerable<Task<IDictionary<string, TagValueCollection>>> queries = null;
+            IEnumerable<Task<IDictionary<TagDefinition, TagValueCollection>>> queries = null;
 
             switch (dataFunction.ToUpperInvariant()) {
                 case DataQueryFunction.Average:
@@ -734,14 +1136,31 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private async Task<IDictionary<string, TagValueCollection>> ReadAverageDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan sampleInterval, CancellationToken cancellationToken) {
-            var result = new ConcurrentDictionary<string, TagValueCollection>();
+        /// <summary>
+        /// Performs an average aggregated data query.
+        /// </summary>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="utcStartTimeAsString">
+        ///   The UTC start time for the query, converted to the ISO format used by Elasticsearch.
+        /// </param>
+        /// <param name="utcStartTimeAsDate">The UTC start time for the query.</param>
+        /// <param name="utcEndTimeAsString">
+        ///   The UTC end time for the query, converted to the ISO format used by Elasticsearch.
+        /// </param>
+        /// <param name="utcEndTimeAsDate">The UTC end time for the query.</param>
+        /// <param name="sampleInterval">The bucket size for the aggregation.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The aggregated data, indexed by tag.
+        /// </returns>
+        private async Task<IDictionary<TagDefinition, TagValueCollection>> ReadAverageDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
 
             var multiSearchRequest = new MultiSearchDescriptor();
-            foreach (var tag in tags) {
+            foreach (var item in tags) {
                 multiSearchRequest = multiSearchRequest
                     .Search<TagValueDocument>(
-                        selector => AddAggregatedDataQuerySearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
+                        selector => AddAggregatedDataQuerySearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
                             .Aggregations(
                                 aa => aa.DateHistogram(
                                     "aika",
@@ -778,7 +1197,7 @@ namespace Aika.Elasticsearch {
 
                 var r = item as SearchResponse<TagValueDocument>;
 
-                result[tag.Name] = new TagValueCollection() {
+                result[tag] = new TagValueCollection() {
                     VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
                     Values = r.Aggs
                               .DateHistogram("aika")
@@ -792,14 +1211,31 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private async Task<IDictionary<string, TagValueCollection>> ReadMinimumDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan sampleInterval, CancellationToken cancellationToken) {
-            var result = new ConcurrentDictionary<string, TagValueCollection>();
+        /// <summary>
+        /// Performs a minimum aggregated data query.
+        /// </summary>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="utcStartTimeAsString">
+        ///   The UTC start time for the query, converted to the ISO format used by Elasticsearch.
+        /// </param>
+        /// <param name="utcStartTimeAsDate">The UTC start time for the query.</param>
+        /// <param name="utcEndTimeAsString">
+        ///   The UTC end time for the query, converted to the ISO format used by Elasticsearch.
+        /// </param>
+        /// <param name="utcEndTimeAsDate">The UTC end time for the query.</param>
+        /// <param name="sampleInterval">The bucket size for the aggregation.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The aggregated data, indexed by tag.
+        /// </returns>
+        private async Task<IDictionary<TagDefinition, TagValueCollection>> ReadMinimumDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
 
             var multiSearchRequest = new MultiSearchDescriptor();
-            foreach (var tag in tags) {
+            foreach (var item in tags) {
                 multiSearchRequest = multiSearchRequest
                     .Search<TagValueDocument>(
-                        selector => AddAggregatedDataQuerySearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
+                        selector => AddAggregatedDataQuerySearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
                             .Aggregations(
                                 aa => aa.DateHistogram(
                                     "aika",
@@ -836,7 +1272,7 @@ namespace Aika.Elasticsearch {
 
                 var r = item as SearchResponse<TagValueDocument>;
 
-                result[tag.Name] = new TagValueCollection() {
+                result[tag] = new TagValueCollection() {
                     VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
                     Values = r.Aggs
                               .DateHistogram("aika")
@@ -850,14 +1286,31 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private async Task<IDictionary<string, TagValueCollection>> ReadMaximumDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan sampleInterval, CancellationToken cancellationToken) {
-            var result = new ConcurrentDictionary<string, TagValueCollection>();
+        /// <summary>
+        /// Performs a maximum aggregated data query.
+        /// </summary>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="utcStartTimeAsString">
+        ///   The UTC start time for the query, converted to the ISO format used by Elasticsearch.
+        /// </param>
+        /// <param name="utcStartTimeAsDate">The UTC start time for the query.</param>
+        /// <param name="utcEndTimeAsString">
+        ///   The UTC end time for the query, converted to the ISO format used by Elasticsearch.
+        /// </param>
+        /// <param name="utcEndTimeAsDate">The UTC end time for the query.</param>
+        /// <param name="sampleInterval">The bucket size for the aggregation.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The aggregated data, indexed by tag.
+        /// </returns>
+        private async Task<IDictionary<TagDefinition, TagValueCollection>> ReadMaximumDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
 
             var multiSearchRequest = new MultiSearchDescriptor();
-            foreach (var tag in tags) {
+            foreach (var item in tags) {
                 multiSearchRequest = multiSearchRequest
                     .Search<TagValueDocument>(
-                        selector => AddAggregatedDataQuerySearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
+                        selector => AddAggregatedDataQuerySearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
                             .Aggregations(
                                 aa => aa.DateHistogram(
                                     "aika",
@@ -894,7 +1347,7 @@ namespace Aika.Elasticsearch {
 
                 var r = item as SearchResponse<TagValueDocument>;
 
-                result[tag.Name] = new TagValueCollection() {
+                result[tag] = new TagValueCollection() {
                     VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
                     Values = r.Aggs
                               .DateHistogram("aika")
@@ -908,14 +1361,31 @@ namespace Aika.Elasticsearch {
         }
 
 
-        private async Task<IDictionary<string, TagValueCollection>> ReadInterpolatedDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan bucketSize, CancellationToken cancellationToken) {
-            var result = new ConcurrentDictionary<string, TagValueCollection>();
+        /// <summary>
+        /// Performs an interpolated data query.
+        /// </summary>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="utcStartTimeAsString">
+        ///   The UTC start time for the query, converted to the ISO format used by Elasticsearch.
+        /// </param>
+        /// <param name="utcStartTimeAsDate">The UTC start time for the query.</param>
+        /// <param name="utcEndTimeAsString">
+        ///   The UTC end time for the query, converted to the ISO format used by Elasticsearch.
+        /// </param>
+        /// <param name="utcEndTimeAsDate">The UTC end time for the query.</param>
+        /// <param name="sampleInterval">The bucket size for the aggregation.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The interpolated data, indexed by tag.
+        /// </returns>
+        private async Task<IDictionary<TagDefinition, TagValueCollection>> ReadInterpolatedDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan bucketSize, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
 
             var multiSearchRequest = new MultiSearchDescriptor();
-            foreach (var tag in tags) {
+            foreach (var item in tags) {
                 multiSearchRequest = multiSearchRequest
                     .Search<TagValueDocument>(
-                        selector => AddAggregatedDataQuerySearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
+                        selector => AddAggregatedDataQuerySearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
                             .Aggregations(
                                 aa => aa.DateHistogram(
                                     "aika",
@@ -965,14 +1435,14 @@ namespace Aika.Elasticsearch {
                                 )
                         )
                     )
-                    .Search<TagValueDocument>(selector => AddPreviousSampleSearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString))
-                    .Search<TagValueDocument>(selector => AddNextSampleSearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString));
+                    .Search<TagValueDocument>(selector => AddPreviousSampleSearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString))
+                    .Search<TagValueDocument>(selector => AddNextSampleSearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString));
             }
 
             var response = await Client.MultiSearchAsync(multiSearchRequest, cancellationToken).ConfigureAwait(false);
 
             var responsesEnumerator = response.AllResponses.GetEnumerator();
-            foreach (var tag in tags) {
+            foreach (var item in tags) {
                 SearchResponse<TagValueDocument> queryResponse;
                 SearchResponse<TagValueDocument> previousValueResponse;
                 SearchResponse<TagValueDocument> nextValueResponse;
@@ -1024,19 +1494,19 @@ namespace Aika.Elasticsearch {
 
                 for (var sampleTime = utcStartTimeAsDate; sampleTime <= utcEndTimeAsDate; sampleTime = sampleTime.Add(bucketSize)) {
                     if (value0 != null && value0.UtcSampleTime == sampleTime) {
-                        resultValues.Add(value0.ToTagValue(units: tag.Units));
+                        resultValues.Add(value0.ToTagValue(units: item.Units));
                         continue;
                     }
                     if (value1 != null && value1.UtcSampleTime == sampleTime) {
-                        resultValues.Add(value1.ToTagValue(units: tag.Units));
+                        resultValues.Add(value1.ToTagValue(units: item.Units));
                         continue;
                     }
                     if (value0 != null && value1 != null && sampleTime > value0.UtcSampleTime && sampleTime < value1.UtcSampleTime) {
                         if (Double.IsNaN(value0.NumericValue) || Double.IsNaN(value1.NumericValue)) {
-                            resultValues.Add(new TagValue(sampleTime, Double.NaN, null, new[] { value0.Quality, value1.Quality }.Min(), tag.Units));
+                            resultValues.Add(new TagValue(sampleTime, Double.NaN, null, new[] { value0.Quality, value1.Quality }.Min(), item.Units));
                         }
                         else {
-                            resultValues.Add(new TagValue(sampleTime, InterpolateValue(value0.UtcSampleTime.Ticks, value0.NumericValue, value1.UtcSampleTime.Ticks, value1.NumericValue, sampleTime.Ticks), null, new[] { value0.Quality, value1.Quality }.Min(), tag.Units));
+                            resultValues.Add(new TagValue(sampleTime, InterpolateValue(value0.UtcSampleTime.Ticks, value0.NumericValue, value1.UtcSampleTime.Ticks, value1.NumericValue, sampleTime.Ticks), null, new[] { value0.Quality, value1.Quality }.Min(), item.Units));
                         }
                         continue;
                     }
@@ -1061,24 +1531,24 @@ namespace Aika.Elasticsearch {
 
                     if (value0 != null && value1 != null && sampleTime >= value0.UtcSampleTime && sampleTime <= value1.UtcSampleTime) {
                         if (value0 != null && value0.UtcSampleTime == sampleTime) {
-                            resultValues.Add(value0.ToTagValue(units: tag.Units));
+                            resultValues.Add(value0.ToTagValue(units: item.Units));
                             continue;
                         }
                         if (value1 != null && value1.UtcSampleTime == sampleTime) {
-                            resultValues.Add(value1.ToTagValue(units: tag.Units));
+                            resultValues.Add(value1.ToTagValue(units: item.Units));
                             continue;
                         }
 
                         if (Double.IsNaN(value0.NumericValue) || Double.IsNaN(value1.NumericValue)) {
-                            resultValues.Add(new TagValue(sampleTime, Double.NaN, null, new[] { value0.Quality, value1.Quality }.Min(), tag.Units));
+                            resultValues.Add(new TagValue(sampleTime, Double.NaN, null, new[] { value0.Quality, value1.Quality }.Min(), item.Units));
                         }
                         else {
-                            resultValues.Add(new TagValue(sampleTime, InterpolateValue(value0.UtcSampleTime.Ticks, value0.NumericValue, value1.UtcSampleTime.Ticks, value1.NumericValue, sampleTime.Ticks), null, new[] { value0.Quality, value1.Quality }.Min(), tag.Units));
+                            resultValues.Add(new TagValue(sampleTime, InterpolateValue(value0.UtcSampleTime.Ticks, value0.NumericValue, value1.UtcSampleTime.Ticks, value1.NumericValue, sampleTime.Ticks), null, new[] { value0.Quality, value1.Quality }.Min(), item.Units));
                         }
                     }
                 }
 
-                result[tag.Name] = new TagValueCollection() {
+                result[item] = new TagValueCollection() {
                     VisualizationHint = TagValueCollectionVisualizationHint.Interpolated,
                     Values = resultValues
                 };
@@ -1088,16 +1558,40 @@ namespace Aika.Elasticsearch {
         }
 
 
-        public override async Task<IDictionary<string, TagValueCollection>> ReadPlotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int intervals, CancellationToken cancellationToken) {
-            if (tagNames == null) {
-                return new Dictionary<string, TagValueCollection>();
-            }
-
-            var result = new ConcurrentDictionary<string, TagValueCollection>();
-            var tags = GetTagsByIdOrName(identity, tagNames);
+        /// <summary>
+        /// Performs a visualization-friendly (plot) data query.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="intervals">The number of intervals to use in the query.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The query results, indexed by tag.
+        /// </returns>
+        /// <remarks>
+        /// 
+        /// <para>
+        /// A plot query divides the query time range into a number of equally-sized <paramref name="intervals"/>.  
+        /// In each interval, the historian returns up to 5 samples: the earliest value, the latest 
+        /// value, the minimum value, the maximum value, and the earliest value in the interval with 
+        /// non-good quality.  It is possible that the same sample meets more than one of the 5 
+        /// criteria.
+        /// </para>
+        /// 
+        /// <para>
+        /// Plot queries as described above are only possible on numeric tags; for non-numeric tags, a
+        /// raw data query is performed instead, with <paramref name="intervals"/> multiplied by 4 used 
+        /// as the maximum number of samples to return.
+        /// </para>
+        /// 
+        /// </remarks>
+        protected override async Task<IDictionary<TagDefinition, TagValueCollection>> ReadPlotData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, int intervals, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
 
             var numericTags = tags.Where(x => x.DataType == TagDataType.FloatingPoint || x.DataType == TagDataType.Integer).ToArray();
-            var nonNumericTags = tags.Except(numericTags);
+            var nonNumericTags = tags.Except(numericTags).ToArray();
 
             var gte = GetIsoDateString(utcStartTime);
             var lte = GetIsoDateString(utcEndTime);
@@ -1116,31 +1610,52 @@ namespace Aika.Elasticsearch {
                 ? MaxSamplesPerTagPerQuery
                 : estimatedPointCount;
 
-            var tagGroups = GetTagQueryGroups(tags, take);
+            var tagGroups = GetTagQueryGroups(numericTags.OfType<ElasticsearchTagDefinition>(), take);
 
-            var queries = tagGroups.Select(grp => ReadPlotDataInternal(grp, gte, utcStartTime, lte, utcEndTime, bucketSize, estimatedPointCount, cancellationToken).ContinueWith(t => {
+            var numericQueries = tagGroups.Select(grp => ReadPlotDataInternal(grp, gte, utcStartTime, lte, utcEndTime, bucketSize, estimatedPointCount, cancellationToken).ContinueWith(t => {
                 cancellationToken.ThrowIfCancellationRequested();
                 foreach (var item in t.Result) {
                     result[item.Key] = item.Value;
                 }
             }, TaskContinuationOptions.OnlyOnRanToCompletion)).ToArray();
 
-            await Task.WhenAny(Task.WhenAll(queries), Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
+            var nonNumericQuery = nonNumericTags.Length > 0
+                ? ReadRawData(identity, nonNumericTags, utcStartTime, utcEndTime, intervals * 4, cancellationToken).ContinueWith(t => {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    foreach (var item in t.Result) {
+                        result[item.Key] = item.Value;
+                    }
+                })
+            : Task.CompletedTask;
+
+            await Task.WhenAny(Task.WhenAll(numericQueries.Concat(new[] { nonNumericQuery })), Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
             return result;
         }
 
 
-        private async Task<IDictionary<string, TagValueCollection>> ReadPlotDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan bucketSize, int nonNumericPointCount, CancellationToken cancellationToken) {
-            var result = new ConcurrentDictionary<string, TagValueCollection>();
+        /// <summary>
+        /// Performs a visualization-friendly (plot) data query.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tags">The tags to query.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="intervals">The number of intervals to use in the query.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The query results, indexed by tag.
+        /// </returns>
+        private async Task<IDictionary<TagDefinition, TagValueCollection>> ReadPlotDataInternal(IEnumerable<ElasticsearchTagDefinition> tags, string utcStartTimeAsString, DateTime utcStartTimeAsDate, string utcEndTimeAsString, DateTime utcEndTimeAsDate, TimeSpan bucketSize, int nonNumericPointCount, CancellationToken cancellationToken) {
+            var result = new ConcurrentDictionary<TagDefinition, TagValueCollection>();
 
             var multiSearchRequest = new MultiSearchDescriptor();
-            foreach (var tag in tags) {
-                if (tag.DataType == TagDataType.FloatingPoint || tag.DataType == TagDataType.Integer) {
+            foreach (var item in tags) {
+                if (item.DataType == TagDataType.FloatingPoint || item.DataType == TagDataType.Integer) {
                     multiSearchRequest = multiSearchRequest
                         .Search<TagValueDocument>(
-                            selector => AddAggregatedDataQuerySearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
+                            selector => AddAggregatedDataQuerySearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString)
                                 .Aggregations(
                                     aa => aa.DateHistogram(
                                         "aika",
@@ -1241,26 +1756,21 @@ namespace Aika.Elasticsearch {
                                     )
                             )
                         )
-                        .Search<TagValueDocument>(selector => AddPreviousSampleSearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString))
-                        .Search<TagValueDocument>(selector => AddNextSampleSearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString));
+                        .Search<TagValueDocument>(selector => AddPreviousSampleSearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString))
+                        .Search<TagValueDocument>(selector => AddNextSampleSearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString));
                 }
                 else {
                     multiSearchRequest = multiSearchRequest
-                        .Search<TagValueDocument>(selector => AddRawDataQuerySearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString, nonNumericPointCount))
-                        .Search<TagValueDocument>(selector => AddPreviousSampleSearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString))
-                        .Search<TagValueDocument>(selector => AddNextSampleSearchDescriptor(selector, tag.IdAsGuid, utcStartTimeAsString));
+                        .Search<TagValueDocument>(selector => AddRawDataQuerySearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString, utcEndTimeAsString, nonNumericPointCount))
+                        .Search<TagValueDocument>(selector => AddPreviousSampleSearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString))
+                        .Search<TagValueDocument>(selector => AddNextSampleSearchDescriptor(selector, item.IdAsGuid, utcStartTimeAsString));
                 }
-            }
-
-            if (Logger?.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Trace) ?? false) {
-                var json = Client.Serializer.SerializeToString(multiSearchRequest);
-                Logger.LogTrace($"PLOT Query: {json}");
             }
 
             var response = await Client.MultiSearchAsync(multiSearchRequest, cancellationToken).ConfigureAwait(false);
 
             var responsesEnumerator = response.AllResponses.GetEnumerator();
-            foreach (var tag in tags) {
+            foreach (var item in tags) {
                 SearchResponse<TagValueDocument> queryResponse;
                 SearchResponse<TagValueDocument> previousValueResponse;
                 SearchResponse<TagValueDocument> nextValueResponse;
@@ -1280,29 +1790,29 @@ namespace Aika.Elasticsearch {
                 }
                 nextValueResponse = responsesEnumerator.Current as SearchResponse<TagValueDocument>;
 
-                if (tag.DataType == TagDataType.FloatingPoint || tag.DataType == TagDataType.Integer) {
+                if (item.DataType == TagDataType.FloatingPoint || item.DataType == TagDataType.Integer) {
                     var values = new List<TagValue>();
 
                     foreach (var bucket in queryResponse.Aggs.DateHistogram("aika").Buckets) {
                         var bucketVals = new List<TagValue>();
 
                         foreach (var hit in bucket.TopHits("min_value").Hits<TagValueDocument>()) {
-                            bucketVals.Add(hit.Source.ToTagValue(units: tag.Units));
+                            bucketVals.Add(hit.Source.ToTagValue(units: item.Units));
                         }
                         foreach (var hit in bucket.TopHits("max_value").Hits<TagValueDocument>()) {
-                            bucketVals.Add(hit.Source.ToTagValue(units: tag.Units));
+                            bucketVals.Add(hit.Source.ToTagValue(units: item.Units));
                         }
                         foreach (var hit in bucket.TopHits("earliest_value").Hits<TagValueDocument>()) {
-                            bucketVals.Add(hit.Source.ToTagValue(units: tag.Units));
+                            bucketVals.Add(hit.Source.ToTagValue(units: item.Units));
                         }
                         foreach (var hit in bucket.TopHits("latest_value").Hits<TagValueDocument>()) {
-                            bucketVals.Add(hit.Source.ToTagValue(units: tag.Units));
+                            bucketVals.Add(hit.Source.ToTagValue(units: item.Units));
                         }
                         foreach (var hit in bucket.TopHits("quality_value").Hits<TagValueDocument>()) {
                             if (hit.Source.Quality == TagValueQuality.Good) {
                                 continue;
                             }
-                            bucketVals.Add(hit.Source.ToTagValue(units: tag.Units));
+                            bucketVals.Add(hit.Source.ToTagValue(units: item.Units));
                         }
 
                         values.AddRange(bucketVals.Distinct().OrderBy(x => x.UtcSampleTime));
@@ -1312,7 +1822,7 @@ namespace Aika.Elasticsearch {
                     if (first != null && first.UtcSampleTime > utcStartTimeAsDate) {
                         var prev = previousValueResponse.Documents.FirstOrDefault();
                         if (prev != null && !Double.IsNaN(prev.NumericValue)) {
-                            values.Insert(0, new TagValue(utcStartTimeAsDate, InterpolateValue(prev.UtcSampleTime.Ticks, prev.NumericValue, first.UtcSampleTime.Ticks, first.NumericValue, utcStartTimeAsDate.Ticks), null, prev.Quality, tag.Units));
+                            values.Insert(0, new TagValue(utcStartTimeAsDate, InterpolateValue(prev.UtcSampleTime.Ticks, prev.NumericValue, first.UtcSampleTime.Ticks, first.NumericValue, utcStartTimeAsDate.Ticks), null, prev.Quality, item.Units));
                         }
                     }
 
@@ -1320,23 +1830,23 @@ namespace Aika.Elasticsearch {
                     if (last != null && last.UtcSampleTime < utcEndTimeAsDate) {
                         var next = nextValueResponse.Documents.FirstOrDefault();
                         if (next != null && !Double.IsNaN(next.NumericValue)) {
-                            values.Add(new TagValue(utcEndTimeAsDate, InterpolateValue(last.UtcSampleTime.Ticks, last.NumericValue, next.UtcSampleTime.Ticks, next.NumericValue, utcEndTimeAsDate.Ticks), null, next.Quality, tag.Units));
+                            values.Add(new TagValue(utcEndTimeAsDate, InterpolateValue(last.UtcSampleTime.Ticks, last.NumericValue, next.UtcSampleTime.Ticks, next.NumericValue, utcEndTimeAsDate.Ticks), null, next.Quality, item.Units));
                         }
                     }
 
-                    result[tag.Name] = new TagValueCollection() {
+                    result[item] = new TagValueCollection() {
                         VisualizationHint = TagValueCollectionVisualizationHint.Interpolated,
                         Values = values
                     };
                 }
                 else {
-                    var values = queryResponse.Documents.Select(x => x.ToTagValue(units: tag.Units)).ToList();
+                    var values = queryResponse.Documents.Select(x => x.ToTagValue(units: item.Units)).ToList();
 
                     var first = values.FirstOrDefault();
                     if (first != null && first.UtcSampleTime > utcStartTimeAsDate) {
                         var prev = previousValueResponse.Documents.FirstOrDefault();
                         if (prev != null) {
-                            values.Insert(0, prev.ToTagValue(utcSampleTime: utcStartTimeAsDate, units: tag.Units));
+                            values.Insert(0, prev.ToTagValue(utcSampleTime: utcStartTimeAsDate, units: item.Units));
                         }
                     }
 
@@ -1344,11 +1854,11 @@ namespace Aika.Elasticsearch {
                     if (last != null && last.UtcSampleTime < utcEndTimeAsDate) {
                         var next = nextValueResponse.Documents.FirstOrDefault();
                         if (next != null) {
-                            values.Add(next.ToTagValue(utcSampleTime: utcEndTimeAsDate, units: tag.Units));
+                            values.Add(next.ToTagValue(utcSampleTime: utcEndTimeAsDate, units: item.Units));
                         }
                     }
 
-                    result[tag.Name] = new TagValueCollection() {
+                    result[item] = new TagValueCollection() {
                         VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
                         Values = values
                     };
@@ -1359,34 +1869,62 @@ namespace Aika.Elasticsearch {
         }
 
 
+        /// <summary>
+        /// Interpolates a value on a slope.
+        /// </summary>
+        /// <param name="x0">The time stamp (in ticks) of the earlier point on the slope.</param>
+        /// <param name="y0">The value of the earlier point on the slope</param>
+        /// <param name="x1">The time stamp (in ticks) of the later point on the slope.</param>
+        /// <param name="y1">The value of the later point on the slope.</param>
+        /// <param name="x">The time stamp (in ticks) to interpolate the Y-value at.</param>
+        /// <returns>
+        /// The interpolated value.
+        /// </returns>
         private static double InterpolateValue(double x0, double y0, double x1, double y1, double x) {
             return ((y0 * (x1 - x)) + (y1 * (x - x0))) / (x1 - x0);
         }
-
 
         #endregion
 
         #region [ Write Tag Data ]
 
-        public override Task<IDictionary<string, bool>> CanWriteTagData(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var result = tagNames.ToDictionary(x => x, x => true);
-            return Task.FromResult<IDictionary<string, bool>>(result);
-        }
-
-
+        /// <summary>
+        /// Sends an updated snapshot value to the snapshot writer.
+        /// </summary>
+        /// <param name="tag">The tag for the value.</param>
+        /// <param name="value">The new value.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A completed task; the write is performed in the background.
+        /// </returns>
         internal Task WriteSnapshotValue(ElasticsearchTagDefinition tag, TagValue value, CancellationToken cancellationToken) {
             _snapshotWriter.WriteValue(tag.IdAsGuid, value);
             return Task.CompletedTask;
         }
 
 
+        /// <summary>
+        /// Inserts values into the Elasticsearch archive indices.
+        /// </summary>
+        /// <param name="tag">The tag for the values.</param>
+        /// <param name="values">The values to insert.</param>
+        /// <param name="nextArchiveCandidate">
+        ///   The updated archive candidate for the tag (i.e. the next value that will potentially be 
+        ///   written to the permanent archive).  This can be <see langword="null"/> e.g. if a bulk
+        ///   insert of history is being performed.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The write result.  Note that, since writing to the archive is performed in the background, 
+        /// the result does not reflect the final written states of the values.
+        /// </returns>
         internal async Task<WriteTagValuesResult> InsertArchiveValues(ElasticsearchTagDefinition tag, IEnumerable<TagValue> values, TagValue nextArchiveCandidate, CancellationToken cancellationToken) {
             foreach (var value in (values ?? new TagValue[0]).Concat(new[] { nextArchiveCandidate })) {
                 if (value == null) {
                     continue;
                 }
 
-                await CreateArchiveIndex(value.UtcSampleTime, cancellationToken).ConfigureAwait(false);
+                await CreateArchiveIndex(tag, value.UtcSampleTime, cancellationToken).ConfigureAwait(false);
             }
 
             _archiveWriter.WriteValues(tag, values, nextArchiveCandidate);

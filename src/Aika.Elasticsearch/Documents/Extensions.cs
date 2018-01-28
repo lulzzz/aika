@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Aika.StateSets;
+using Aika.Tags;
 
 namespace Aika.Elasticsearch.Documents {
     public static class Extensions {
@@ -26,7 +28,7 @@ namespace Aika.Elasticsearch.Documents {
                     Limit = tag.DataFilter.CompressionFilter.Settings.Limit,
                     WindowSize = tag.DataFilter.CompressionFilter.Settings.WindowSize
                 },
-                Security = tag.Security?.ToArray(),
+                Security = tag.Security.ToTagDocumentSecurity(),
                 Metadata = new TagDocument.TagMetadata() {
                     UtcCreatedAt = tag.Metadata.UtcCreatedAt,
                     Creator = tag.Metadata.Creator,
@@ -62,6 +64,33 @@ namespace Aika.Elasticsearch.Documents {
 
         public static TagMetadata ToTagMetadata(this TagDocument tag) {
             return new TagMetadata(tag.Metadata?.UtcCreatedAt ?? DateTime.MinValue, tag.Metadata?.Creator, tag.Metadata?.UtcLastModifiedAt, tag.Metadata?.LastModifiedBy);
+        }
+
+
+        public static Tags.Security.TagSecurity ToTagSecurity(this TagDocument.TagSecurity tagSecurity) {
+            return new Tags.Security.TagSecurity(tagSecurity.Owner,
+                                            tagSecurity.Policies?
+                                                       .ToDictionary(x => x.Key,
+                                                                     x => new Tags.Security.TagSecurityPolicy(x.Value.Allow.Select(p => new Tags.Security.TagSecurityEntry(p.ClaimType, p.Value)).ToArray(),
+                                                                                                         x.Value.Deny.Select(p => new Tags.Security.TagSecurityEntry(p.ClaimType, p.Value)).ToArray())));
+        }
+
+
+        public static TagDocument.TagSecurity ToTagDocumentSecurity(this Tags.Security.TagSecurity tagSecurity) {
+            return new TagDocument.TagSecurity() {
+                Owner = tagSecurity.Owner,
+                Policies = tagSecurity.Policies.ToDictionary(x => x.Key,
+                                                             x => new TagDocument.TagSecurityPolicy() {
+                                                                 Allow = x.Value.Allow.Select(p => new TagDocument.TagSecurityEntry() {
+                                                                     ClaimType = p.ClaimType,
+                                                                     Value = p.Value
+                                                                 }).ToArray(),
+                                                                 Deny = x.Value.Deny.Select(p => new TagDocument.TagSecurityEntry() {
+                                                                     ClaimType = p.ClaimType,
+                                                                     Value = p.Value
+                                                                 }).ToArray()
+                                                             })
+            };
         }
 
 

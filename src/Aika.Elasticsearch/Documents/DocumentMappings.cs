@@ -26,8 +26,12 @@ namespace Aika.Elasticsearch.Documents {
         }
 
 
-        public static string GetIndexNameForArchiveTagValue(string baseName, DateTime utcSampleTime) {
-            return $"{baseName}{utcSampleTime:yyyy-MM}";
+        public static string GetIndexNameForArchiveTagValue(string baseName, ElasticsearchTagDefinition tag, DateTime utcSampleTime, ArchiveIndexNameSuffixGenerator suffixGenerator) {
+            var suffix = suffixGenerator == null
+                ? utcSampleTime.ToString("yyyy-MM")
+                : suffixGenerator.Invoke(tag, utcSampleTime);
+
+            return baseName + suffix;
         }
 
 

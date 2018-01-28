@@ -123,6 +123,9 @@
   <data name="Error_AtLeastOneTagNameRequired" xml:space="preserve">
     <value>You must specify at least one tag name.</value>
   </data>
+  <data name="Error_CannotOperateOnTagsOwnedByAnotherHistorian" xml:space="preserve">
+    <value>Tag operations cannot be performed on tags owned by another historian.</value>
+  </data>
   <data name="Error_ChangeDescriptionIsRequired" xml:space="preserve">
     <value>You must specify a change description.</value>
   </data>
@@ -165,6 +168,9 @@
   </data>
   <data name="Error_TagIdOrNameIsRequired" xml:space="preserve">
     <value>You must specify a tag ID or name.</value>
+  </data>
+  <data name="Error_TagNotFound" xml:space="preserve">
+    <value>The specified tag was not found.</value>
   </data>
   <data name="Error_TagStateSetIsRequired" xml:space="preserve">
     <value>The tag's state set is required.</value>

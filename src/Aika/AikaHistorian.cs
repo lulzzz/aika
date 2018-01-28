@@ -8,6 +8,8 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Aika.StateSets;
+using Aika.Tags;
 using Microsoft.Extensions.Logging;
 
 namespace Aika {
@@ -172,9 +174,9 @@ namespace Aika {
         /// <param name="func">A callback function that will ensure that the calling <paramref name="identity"/> has the required permissions for the tags.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// A task that will return the tag definitions.
+        /// A task that will return the tag definitions, indexed by the entry in <paramref name="tagIdsOrNames"/>.
         /// </returns>
-        private async Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, Func<ClaimsPrincipal, IEnumerable<string>, CancellationToken, Task<IDictionary<string, bool>>> func, CancellationToken cancellationToken) {
+        private async Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, Func<ClaimsPrincipal, IEnumerable<string>, CancellationToken, Task<IDictionary<string, bool>>> func, CancellationToken cancellationToken) {
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -193,7 +195,7 @@ namespace Aika {
                 : (await RunWithImmediateCancellation(func(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false)).Where(x => x.Value).Select(x => x.Key).ToArray();
 
             if (authorisedTagNames.Length == 0) {
-                return new TagDefinition[0];
+                return new Dictionary<string, TagDefinition>();
             }
 
             var result = await RunWithImmediateCancellation(_historian.GetTags(identity, authorisedTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
@@ -214,7 +216,7 @@ namespace Aika {
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="tagIdsOrNames"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="tagIdsOrNames"/> does not contain any non-null-or-empty entries.</exception>
-        public Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
+        public Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
             ThrowIfNotReady();
             return GetTags(identity, tagIdsOrNames, null, cancellationToken);
         }
@@ -293,27 +295,32 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagNames));
             }
 
-            var authResult = await RunWithImmediateCancellation(_historian.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
+            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
+                                     .ToDictionary(x => x.Key, x => x.Value);
 
-            var authorisedTagNames = authResult.Where(x => x.Value).Select(x => x.Key).ToArray();
-            var unauthorisedTagNames = authResult.Where(x => !x.Value).Select(x => x.Key).ToArray();
+            var result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
+            IDictionary<TagDefinition, TagValueCollection> dataQueryResult;
 
-            IDictionary<string, TagValueCollection> result;
-
-            if (authorisedTagNames.Length == 0) {
-                result = new Dictionary<string, TagValueCollection>();
+            if (authorizedTags.Count == 0) {
+                dataQueryResult = new Dictionary<TagDefinition, TagValueCollection>();
             }
             else {
-                result = await RunWithImmediateCancellation(_historian.ReadRawData(identity, authorisedTagNames, utcStartTime, utcEndTime, pointCount < 0 ? 0 : pointCount, cancellationToken), cancellationToken).ConfigureAwait(false);
+                dataQueryResult = await RunWithImmediateCancellation(_historian.ReadRawData(identity, authorizedTags.Values, utcStartTime, utcEndTime, pointCount < 0 ? 0 : pointCount, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
 
-            foreach (var tagName in unauthorisedTagNames) {
-                result[tagName] = new TagValueCollection() {
-                    VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
-                    Values = new[] {
-                        TagValue.CreateUnauthorizedTagValue(utcStartTime)
-                    }
-                };
+            foreach (var item in tags) {
+                if (dataQueryResult.TryGetValue(item.Value, out var vals)) {
+                    result[item.Key] = vals;
+                }
+                else {
+                    result[item.Key] = new TagValueCollection() {
+                        VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
+                        Values = new[] {
+                            TagValue.CreateUnauthorizedTagValue(utcStartTime)
+                        }
+                    };
+                }
             }
 
             return result;
@@ -344,27 +351,32 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagNames));
             }
 
-            var authResult = await RunWithImmediateCancellation(_historian.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
+            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
+                                     .ToDictionary(x => x.Key, x => x.Value);
 
-            var authorisedTagNames = authResult.Where(x => x.Value).Select(x => x.Key).ToArray();
-            var unauthorisedTagNames = authResult.Where(x => !x.Value).Select(x => x.Key).ToArray();
+            var result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
+            IDictionary<TagDefinition, TagValueCollection> dataQueryResult;
 
-            IDictionary<string, TagValueCollection> result;
-
-            if (authorisedTagNames.Length == 0) {
-                result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
+            if (authorizedTags.Count == 0) {
+                dataQueryResult = new Dictionary<TagDefinition, TagValueCollection>();
             }
             else {
-                result = await RunWithImmediateCancellation(_historian.ReadPlotData(identity, authorisedTagNames, utcStartTime, utcEndTime, intervals, cancellationToken), cancellationToken).ConfigureAwait(false);
+                dataQueryResult = await RunWithImmediateCancellation(_historian.ReadPlotData(identity, authorizedTags.Values, utcStartTime, utcEndTime, intervals, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
 
-            foreach (var tagName in unauthorisedTagNames) {
-                result[tagName] = new TagValueCollection() {
-                    VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
-                    Values = new[] {
-                        TagValue.CreateUnauthorizedTagValue(utcStartTime)
-                    }
-                };
+            foreach (var item in tags) {
+                if (dataQueryResult.TryGetValue(item.Value, out var vals)) {
+                    result[item.Key] = vals;
+                }
+                else {
+                    result[item.Key] = new TagValueCollection() {
+                        VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
+                        Values = new[] {
+                            TagValue.CreateUnauthorizedTagValue(utcStartTime)
+                        }
+                    };
+                }
             }
 
             return result;
@@ -419,21 +431,21 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_StartTimeCannotBeLaterThanEndTime, nameof(utcStartTime));
             }
 
-            var authResult = await RunWithImmediateCancellation(_historian.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
+            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
+                                     .ToDictionary(x => x.Key, x => x.Value);
 
-            var authorisedTagNames = authResult.Where(x => x.Value).Select(x => x.Key).ToArray();
-            var unauthorisedTagNames = authResult.Where(x => !x.Value).Select(x => x.Key).ToArray();
+            var result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
+            IDictionary<TagDefinition, TagValueCollection> dataQueryResult;
 
-            IDictionary<string, TagValueCollection> result; 
-
-            if (authorisedTagNames.Length == 0) {
-                result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
+            if (authorizedTags.Count == 0) {
+                dataQueryResult = new Dictionary<TagDefinition, TagValueCollection>();
             }
             else {
                 var supportedDataFunctions = await GetAvailableNativeDataQueryFunctions(cancellationToken).ConfigureAwait(false);
                 var func = supportedDataFunctions?.FirstOrDefault(x => String.Equals(dataFunction, x.Name, StringComparison.OrdinalIgnoreCase));
 
-                Task<IDictionary<string, TagValueCollection>> query;
+                Task<IDictionary<TagDefinition, TagValueCollection>> query;
 
                 if (func != null) {
                     // For functons that are supported by the underlying historian, delegate the 
@@ -441,16 +453,16 @@ namespace Aika {
 
                     // Check which of the tags actually support the data function being used.
 
-                    var canUseFunc = await _historian.IsDataQueryFunctionSupported(identity, authorisedTagNames, func.Name, cancellationToken).ConfigureAwait(false);
+                    var canUseFunc = await _historian.IsDataQueryFunctionSupported(identity, authorizedTags.Values, func.Name, cancellationToken).ConfigureAwait(false);
 
-                    var supportedTags = new List<string>();
-                    foreach (var tag in authorisedTagNames) {
-                        if (canUseFunc.TryGetValue(tag, out var supported) && supported) {
-                            supportedTags.Add(tag);
+                    var supportedTags = new List<TagDefinition>();
+                    foreach (var item in canUseFunc) {
+                        if (item.Value) {
+                            supportedTags.Add(item.Key);
                         }
                     }
 
-                    var unsupportedTags = authorisedTagNames.Except(supportedTags).ToArray();
+                    var unsupportedTags = authorizedTags.Values.Except(supportedTags).ToArray();
 
                     if (unsupportedTags.Length == 0) {
                         // All the tags in the request support the data function; we just need to make 
@@ -465,7 +477,7 @@ namespace Aika {
                         // the tags that support it, and raw data for those that don't.
 
                         query = Task.Run(async () => {
-                            IDictionary<string, TagValueCollection> res = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
+                            IDictionary<TagDefinition, TagValueCollection> res = new Dictionary<TagDefinition, TagValueCollection>();
 
                             var supportedQuery = pointCount.HasValue
                                 ? _historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
@@ -496,10 +508,6 @@ namespace Aika {
                     // supported by AggregationUtility, we'll request raw data and then perform 
                     // the aggregation here.
 
-                    // The aggregation helper requires the definitions of the tags that we are 
-                    // processing.
-                    var tags = await GetTags(identity, authorisedTagNames, cancellationToken).ConfigureAwait(false);
-
                     // We need to subtract one interval from the query start time for the raw data.  
                     // This is so that we can calculate an aggregated value at the utcStartTime that 
                     // the caller specified.
@@ -509,7 +517,7 @@ namespace Aika {
                     }
                     var queryStartTime = utcStartTime.Subtract(sampleInterval);
 
-                    query = _historian.ReadRawData(identity, authorisedTagNames, queryStartTime, utcEndTime, 0, cancellationToken).ContinueWith(t => {
+                    query = _historian.ReadRawData(identity, authorizedTags.Values, queryStartTime, utcEndTime, 0, cancellationToken).ContinueWith(t => {
                         var aggregator = new AggregationUtility(_loggerFactory);
                         // We'll hint that INTERP data can be interpolated on a chart, but 
                         // other functions should use trailing-edge transitions.
@@ -520,34 +528,39 @@ namespace Aika {
                         var aggregatedData = t.Result
                                               .ToDictionary(x => x.Key, 
                                                             x => new TagValueCollection() {
-                                                                Values = aggregator.Aggregate(tags.First(tag => tag.Name.Equals(x.Key, StringComparison.OrdinalIgnoreCase)), dataFunction, utcStartTime, utcEndTime, sampleInterval, x.Value.Values),
+                                                                Values = aggregator.Aggregate(x.Key, dataFunction, utcStartTime, utcEndTime, sampleInterval, x.Value.Values),
                                                                 VisualizationHint = visualizationHint
                                                             });
-                        return (IDictionary<string, TagValueCollection>) aggregatedData;
+                        return (IDictionary<TagDefinition, TagValueCollection>) aggregatedData;
                     }, cancellationToken, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Current);
                 }
                 else {
                     // The underlying historian does not support the function, and neither do we.
-                    var vals = authorisedTagNames.ToDictionary(x => x,
-                                                               x => new TagValueCollection() {
-                                                                   VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
-                                                                   Values = new[] {
-                                                                       new TagValue(utcStartTime, Double.NaN, Resources.Error_UnsupportedDataFunction, TagValueQuality.Bad, null)
-                                                                   }
-                                                               });
-                    query = Task.FromResult<IDictionary<string, TagValueCollection>>(vals);
+                    var vals = authorizedTags.ToDictionary(x => x.Value,
+                                                                x => new TagValueCollection() {
+                                                                    VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
+                                                                    Values = new[] {
+                                                                        new TagValue(utcStartTime, Double.NaN, Resources.Error_UnsupportedDataFunction, TagValueQuality.Bad, null)
+                                                                    }
+                                                                });
+                    query = Task.FromResult<IDictionary<TagDefinition, TagValueCollection>>(vals);
                 }
 
-                result = await RunWithImmediateCancellation(query, cancellationToken);
+                dataQueryResult = await RunWithImmediateCancellation(query, cancellationToken);
             }
 
-            foreach (var tagName in unauthorisedTagNames) {
-                result[tagName] = new TagValueCollection() {
-                    VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
-                    Values = new[] {
-                        TagValue.CreateUnauthorizedTagValue(utcStartTime)
-                    }
-                };
+            foreach (var item in tags) {
+                if (dataQueryResult.TryGetValue(item.Value, out var vals)) {
+                    result[item.Key] = vals;
+                }
+                else {
+                    result[item.Key] = new TagValueCollection() {
+                        VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
+                        Values = new[] {
+                            TagValue.CreateUnauthorizedTagValue(utcStartTime)
+                        }
+                    };
+                }
             }
 
             return result;
@@ -652,23 +665,27 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagNames));
             }
 
-            var authResult = await RunWithImmediateCancellation(_historian.CanReadTagData(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
+            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
+                                     .ToDictionary(x => x.Key, x => x.Value);
 
-            var authorisedTagNames = authResult.Where(x => x.Value).Select(x => x.Key).ToArray();
-            var unauthorisedTagNames = authResult.Where(x => !x.Value).Select(x => x.Key).ToArray();
+            var result = new Dictionary<string, TagValue>(StringComparer.OrdinalIgnoreCase);
+            IDictionary<TagDefinition, TagValue> dataQueryResult;
 
-            IDictionary<string, TagValue> result;
-
-            if (authorisedTagNames.Length == 0) {
-                result = new Dictionary<string, TagValue>();
+            if (authorizedTags.Count == 0) {
+                dataQueryResult = new Dictionary<TagDefinition, TagValue>();
             }
             else {
-                var query = _historian.ReadSnapshotData(identity, authorisedTagNames, cancellationToken);
-                result = await RunWithImmediateCancellation(query, cancellationToken);
+                dataQueryResult = await RunWithImmediateCancellation(_historian.ReadSnapshotData(identity, authorizedTags.Values, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
 
-            foreach (var tagName in unauthorisedTagNames) {
-                result[tagName] = TagValue.CreateUnauthorizedTagValue(DateTime.MinValue);
+            foreach (var item in tags) {
+                if (dataQueryResult.TryGetValue(item.Value, out var val)) {
+                    result[item.Key] = val;
+                }
+                else {
+                    result[item.Key] = TagValue.CreateUnauthorizedTagValue(DateTime.MinValue);
+                }
             }
 
             return result;
@@ -702,32 +719,13 @@ namespace Aika {
         #region [ Tag Data Writes ]
 
         /// <summary>
-        /// For a set of tag names, gets the tag definition objects that the caller is authorised to write to.
-        /// </summary>
-        /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagNames">The tag names to test.</param>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// A task that will return the tag definitions that the caller is allowed to write to.
-        /// </returns>
-        private Task<IEnumerable<TagDefinition>> GetWriteableTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
-            var task = GetTags(identity,
-                               tagNames,
-                               (id, n, ct) => _historian.CanWriteTagData(id, n, ct),
-                               cancellationToken);
-
-            return RunWithImmediateCancellation(task, cancellationToken);
-        }
-
-
-        /// <summary>
         /// Inserts tag data into the historian archive.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="values">The values to write, indexed by tag name.</param>
+        /// <param name="values">The values to write, indexed by tag name or ID.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// The results of the insert, indexed by tag name.
+        /// The results of the insert, indexed by the keys used in <paramref name="values"/>.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
@@ -755,22 +753,24 @@ namespace Aika {
             // to the tag and the values dictionary contains at least one value for the tag.
             var tagNames = values.Where(x => x.Value != null && x.Value.Any(v => v != null)).Select(x => x.Key);
 
-            var tags = await GetWriteableTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
-            var unauthorizedTags = tagNames.Except(tags.Select(x => x.Name)).ToArray();
+            var tags = await GetTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
+            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataWrite, Tags.Security.TagSecurityPolicy.Administrator))
+                                     .ToDictionary(x => x.Key, x => x.Value);
+
+            var unauthorizedTags = tags.Where(x => !authorizedTags.ContainsKey(x.Key)).ToArray();
 
             foreach (var item in unauthorizedTags) {
-                result[item] = WriteTagValuesResult.CreateUnauthorizedResult();
+                result[item.Key] = WriteTagValuesResult.CreateUnauthorizedResult();
             }
 
-            if (!tags.Any()) {
+            if (authorizedTags.Count == 0) {
                 return result;
             }
 
             var tasks = new List<Task>(values.Count);
 
             foreach (var item in values) {
-                var tag = tags.FirstOrDefault(x => String.Equals(x.Name, item.Key, StringComparison.OrdinalIgnoreCase));
-                if (tag == null) {
+                if (!tags.TryGetValue(item.Key, out var tag)) {
                     continue;
                 }
 
@@ -781,10 +781,10 @@ namespace Aika {
 
                 tasks.Add(Task.Run(async () => {
                     try {
-                        result[tag.Name] = await tag.InsertArchiveValues(identity, valuesToInsert, cancellationToken).ConfigureAwait(false);
+                        result[item.Key] = await tag.InsertArchiveValues(identity, valuesToInsert, cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception e) {
-                        result[tag.Name] = new WriteTagValuesResult(false, 0, null, null, new[] { e.Message });
+                        result[item.Key] = new WriteTagValuesResult(false, 0, null, null, new[] { e.Message });
                     }
                 }));
             }
@@ -835,26 +835,28 @@ namespace Aika {
             // to the tag and the values dictionary contains at least one value for the tag.
             var tagNames = values.Where(x => x.Value != null && x.Value.Any(v => v != null)).Select(x => x.Key);
 
-            var tags = await GetWriteableTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
-            var unauthorizedTags = tagNames.Except(tags.Select(x => x.Name)).ToArray();
+            var tags = await GetTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
+            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataWrite, Tags.Security.TagSecurityPolicy.Administrator))
+                                     .ToDictionary(x => x.Key, x => x.Value);
+
+            var unauthorizedTags = tags.Where(x => !authorizedTags.ContainsKey(x.Key)).ToArray();
 
             foreach (var item in unauthorizedTags) {
-                result[item] = WriteTagValuesResult.CreateUnauthorizedResult();
+                result[item.Key] = WriteTagValuesResult.CreateUnauthorizedResult();
             }
 
-            if (!tags.Any()) {
+            if (authorizedTags.Count == 0) {
                 return result;
             }
 
             var valuesToForward = new Dictionary<string, IEnumerable<TagValue>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var item in values) {
-                var tag = tags.FirstOrDefault(x => String.Equals(x.Name, item.Key, StringComparison.OrdinalIgnoreCase));
-                if (tag == null) {
+                if (!tags.TryGetValue(item.Key, out var tag)) {
                     continue;
                 }
 
-                result[tag.Name] = await tag.WriteSnapshotValues(identity, item.Value, cancellationToken).ConfigureAwait(false);
+                result[item.Key] = await tag.WriteSnapshotValues(identity, item.Value, cancellationToken).ConfigureAwait(false);
             }
 
             return result;
@@ -863,27 +865,6 @@ namespace Aika {
         #endregion
 
         #region [ Tag Management ]
-
-        /// <summary>
-        /// Gets the number of tags in the historian.
-        /// </summary>
-        /// <param name="identity">The identity of the caller.</param>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// A task that will return the number of tags in the historian.  Note that the underlying 
-        /// <see cref="IHistorian"/> may choose to return <see langword="null"/> instead of providing 
-        /// a tag count.
-        /// </returns>
-        /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
-        /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
-        public async Task<int?> GetTagCount(ClaimsPrincipal identity, CancellationToken cancellationToken) {
-            ThrowIfNotReady();
-            if (identity == null) {
-                throw new ArgumentNullException(nameof(identity));
-            }
-            return await _historian.GetTagCount(identity, cancellationToken).ConfigureAwait(false);
-        }
-
 
         /// <summary>
         /// Validates the specified exception filter settings.
@@ -1059,7 +1040,12 @@ namespace Aika {
                 settings.CompressionFilterSettings = ValidateCompressionFilterSettings(settings.DataType, settings.CompressionFilterSettings);
             }
 
-            return await _historian.UpdateTag(identity, tagId, settings, description, cancellationToken).ConfigureAwait(false);
+            var tag = (await GetTags(identity, new[] { tagId }, cancellationToken).ConfigureAwait(false)).FirstOrDefault().Value;
+            if (tag == null) {
+                throw new ArgumentException(Resources.Error_TagNotFound, nameof(tagId));
+            }
+
+            return await _historian.UpdateTag(identity, tag, settings, description, cancellationToken).ConfigureAwait(false);
         }
 
 

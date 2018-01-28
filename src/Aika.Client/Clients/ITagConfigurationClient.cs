@@ -13,17 +13,6 @@ namespace Aika.Client.Clients {
     public interface ITagConfigurationClient {
 
         /// <summary>
-        /// Gets the total number of tags defined in the historian, if supported by Aika's underlying 
-        /// historian implementation.  Authorized using the <c>aika:managetags</c> authorization policy.
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// A task that will return the number of tags in the historian, if available.
-        /// </returns>
-        Task<int?> GetTagCount(CancellationToken cancellationToken);
-
-
-        /// <summary>
         /// Performs a tag search and returns extended information about the matching tags.  Authorized 
         /// using the <c>aika:managetags</c> authorization policy.
         /// </summary>

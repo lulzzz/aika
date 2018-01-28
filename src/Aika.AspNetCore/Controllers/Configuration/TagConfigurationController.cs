@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Aika.Client.Dto;
+using Aika.Tags;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,42 +32,6 @@ namespace Aika.AspNetCore.Controllers.Configuration {
         /// <exception cref="ArgumentNullException"><paramref name="historian"/> is <see langword="null"/>.</exception>
         public TagConfigurationController(AikaHistorian historian) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
-        }
-
-
-        /// <summary>
-        /// Gets the number of configured tags.
-        /// </summary>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// Successful responses contain the number of configured tags.  The response content will be 
-        /// <see langword="null"/> if the underlying historian chooses to not make this information 
-        /// available.
-        /// </returns>
-        [HttpGet]
-        [Route("count")]
-        [ProducesResponseType(200, Type = typeof(int?))]
-        public async Task<IActionResult> GetTagCount(CancellationToken cancellationToken) {
-            if (!ModelState.IsValid) {
-                return BadRequest(ModelState); // 400
-            }
-
-            try {
-                var result = await _historian.GetTagCount(User, cancellationToken).ConfigureAwait(false);
-                return Ok(result); // 200
-            }
-            catch (OperationCanceledException) {
-                return StatusCode(204); // 204
-            }
-            catch (SecurityException) {
-                return Forbid(); // 403
-            }
-            catch (NotSupportedException) {
-                return BadRequest(); // 400
-            }
-            catch (NotImplementedException) {
-                return BadRequest(); // 400
-            }
         }
 
 
@@ -126,7 +91,9 @@ namespace Aika.AspNetCore.Controllers.Configuration {
 
             try {
                 var result = await _historian.GetTags(User, new[] { id }, cancellationToken).ConfigureAwait(false);
-                var tag = result.FirstOrDefault(x => x.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+                if (!result.TryGetValue(id, out var tag)) {
+
+                }
                 if (tag == null) {
                     return NotFound(id);
                 }
