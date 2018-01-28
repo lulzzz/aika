@@ -12,6 +12,7 @@ services.AddSingleton(x => {
     var settings = new Nest.ConnectionSettings(new Uri("http://localhost:9200")).ThrowExceptions(true);
     return new Nest.ElasticClient(settings);
 });
+services.AddSingleton(new Aika.Elasticsearch.Options());
 services.AddAikaHistorian<Aika.Elasticsearch.ElasticsearchHistorian>();
 ```
 
