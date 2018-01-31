@@ -1,28 +1,30 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.27130.2010
+VisualStudioVersion = 15.0.27130.2027
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika", "Aika\Aika.csproj", "{05BCDA09-9602-4ECB-A455-2E82D930955A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika", "src\Aika\Aika.csproj", "{05BCDA09-9602-4ECB-A455-2E82D930955A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.InMemoryHistorian", "Aika.InMemoryHistorian\Aika.InMemoryHistorian.csproj", "{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.InMemoryHistorian", "src\Aika.InMemoryHistorian\Aika.InMemoryHistorian.csproj", "{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.SampleApp", "Aika.SampleApp\Aika.SampleApp.csproj", "{E4486316-6517-4E2C-8039-DDDE4434CB6B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.SampleApp", "src\Aika.SampleApp\Aika.SampleApp.csproj", "{E4486316-6517-4E2C-8039-DDDE4434CB6B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.AspNetCore", "Aika.AspNetCore\Aika.AspNetCore.csproj", "{BEC0FBBA-4516-48F0-BB39-CE645F6B2217}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.AspNetCore", "src\Aika.AspNetCore\Aika.AspNetCore.csproj", "{BEC0FBBA-4516-48F0-BB39-CE645F6B2217}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.Client", "Aika.Client\Aika.Client.csproj", "{3326AF72-1E4F-4E24-A971-31C097E86CA6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.Client", "src\Aika.Client\Aika.Client.csproj", "{3326AF72-1E4F-4E24-A971-31C097E86CA6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.Redis", "src\Aika.Redis\Aika.Redis.csproj", "{6183900F-49E4-4556-9AE7-7C31F0599429}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.Elasticsearch", "src\Aika.Elasticsearch\Aika.Elasticsearch.csproj", "{FDF4F01E-E2E4-4576-9EC2-F6E93B22016F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{17FA93D8-CAFC-49C1-AEEA-510621BE0830}"
 	ProjectSection(SolutionItems) = preProject
-		..\.editorconfig = ..\.editorconfig
-		..\.gitignore = ..\.gitignore
-		..\README.md = ..\README.md
+		.editorconfig = .editorconfig
+		.gitignore = .gitignore
+		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.Redis", "Aika.Redis\Aika.Redis.csproj", "{6183900F-49E4-4556-9AE7-7C31F0599429}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Aika.Elasticsearch", "Aika.Elasticsearch\Aika.Elasticsearch.csproj", "{FDF4F01E-E2E4-4576-9EC2-F6E93B22016F}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{730DBE85-64F9-4DD4-A5A0-9F4EC6431C8D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -61,6 +63,15 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{05BCDA09-9602-4ECB-A455-2E82D930955A} = {730DBE85-64F9-4DD4-A5A0-9F4EC6431C8D}
+		{A9E1BCC5-D51E-41C7-B1F9-BA1BEB0C3F83} = {730DBE85-64F9-4DD4-A5A0-9F4EC6431C8D}
+		{E4486316-6517-4E2C-8039-DDDE4434CB6B} = {730DBE85-64F9-4DD4-A5A0-9F4EC6431C8D}
+		{BEC0FBBA-4516-48F0-BB39-CE645F6B2217} = {730DBE85-64F9-4DD4-A5A0-9F4EC6431C8D}
+		{3326AF72-1E4F-4E24-A971-31C097E86CA6} = {730DBE85-64F9-4DD4-A5A0-9F4EC6431C8D}
+		{6183900F-49E4-4556-9AE7-7C31F0599429} = {730DBE85-64F9-4DD4-A5A0-9F4EC6431C8D}
+		{FDF4F01E-E2E4-4576-9EC2-F6E93B22016F} = {730DBE85-64F9-4DD4-A5A0-9F4EC6431C8D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A0391908-7746-4AF8-B71D-2561902532FA}
