@@ -139,7 +139,7 @@ namespace Aika {
         /// Reads raw, unprocessed tag data.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tag">The tags to query.</param>
+        /// <param name="tags">The tags to query.</param>
         /// <param name="utcStartTime">The UTC start time for the query.</param>
         /// <param name="utcEndTime">The UTC end time for the query.</param>
         /// <param name="pointCount">

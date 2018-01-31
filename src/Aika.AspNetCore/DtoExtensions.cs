@@ -388,7 +388,7 @@ namespace Aika.AspNetCore {
 
 
         /// <summary>
-        /// Converts the object into the format required for an <see cref="ITagDataWriter"/> write call.
+        /// Converts the object into the format required for a write call.
         /// </summary>
         /// <param name="writeRequest">The rwquest to convert.</param>
         /// <returns>
