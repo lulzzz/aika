@@ -91,7 +91,7 @@ namespace Aika.Elasticsearch {
             try {
                 foreach (var value in values ?? new TagValue[0]) {
                     var op = new BulkIndexOperation<TagValueDocument>(value.ToTagValueDocument(tag, null)) {
-                        Index = DocumentMappings.GetIndexNameForArchiveTagValue(_historian.ArchiveIndexNamePrefix, tag, value.UtcSampleTime, _historian.ArchiveIndexSuffixGenerator)
+                        Index = IndexUtility.GetIndexNameForArchiveTagValue(_historian.ArchiveIndexNamePrefix, tag, value.UtcSampleTime, _historian.ArchiveIndexSuffixGenerator)
                     };
                     _nextInsert.AddOperation(op);
                 }

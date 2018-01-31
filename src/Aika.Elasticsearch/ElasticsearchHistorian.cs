@@ -223,27 +223,27 @@ namespace Aika.Elasticsearch {
             // Make sure that the fixed indices (tag definitions, change history, state sets, snapshot values, and archive candidate values) exist.
             var existsResponse = await Client.IndexExistsAsync(new IndexExistsRequest(TagsIndexName), cancellationToken).ConfigureAwait(false);
             if (!existsResponse.Exists) {
-                await Client.CreateIndexAsync(DocumentMappings.GetTagsIndexDescriptor(TagsIndexName), cancellationToken).ConfigureAwait(false);
+                await Client.CreateIndexAsync(IndexUtility.GetTagsIndexDescriptor(TagsIndexName), cancellationToken).ConfigureAwait(false);
             }
 
             existsResponse = await Client.IndexExistsAsync(new IndexExistsRequest(TagChangeHistoryIndexName), cancellationToken).ConfigureAwait(false);
             if (!existsResponse.Exists) {
-                await Client.CreateIndexAsync(DocumentMappings.GetTagsIndexDescriptor(TagChangeHistoryIndexName), cancellationToken).ConfigureAwait(false);
+                await Client.CreateIndexAsync(IndexUtility.GetTagsIndexDescriptor(TagChangeHistoryIndexName), cancellationToken).ConfigureAwait(false);
             }
 
             existsResponse = await Client.IndexExistsAsync(new IndexExistsRequest(StateSetsIndexName), cancellationToken).ConfigureAwait(false);
             if (!existsResponse.Exists) {
-                await Client.CreateIndexAsync(DocumentMappings.GetStateSetsIndexDescriptor(StateSetsIndexName), cancellationToken).ConfigureAwait(false);
+                await Client.CreateIndexAsync(IndexUtility.GetStateSetsIndexDescriptor(StateSetsIndexName), cancellationToken).ConfigureAwait(false);
             }
 
             existsResponse = await Client.IndexExistsAsync(new IndexExistsRequest(SnapshotValuesIndexName), cancellationToken).ConfigureAwait(false);
             if (!existsResponse.Exists) {
-                await Client.CreateIndexAsync(DocumentMappings.GetSnapshotOrArchiveCandidateValuesIndexDescriptor(SnapshotValuesIndexName), cancellationToken).ConfigureAwait(false);
+                await Client.CreateIndexAsync(IndexUtility.GetSnapshotOrArchiveCandidateValuesIndexDescriptor(SnapshotValuesIndexName), cancellationToken).ConfigureAwait(false);
             }
 
             existsResponse = await Client.IndexExistsAsync(new IndexExistsRequest(ArchiveCandidatesIndexName), cancellationToken).ConfigureAwait(false);
             if (!existsResponse.Exists) {
-                await Client.CreateIndexAsync(DocumentMappings.GetSnapshotOrArchiveCandidateValuesIndexDescriptor(ArchiveCandidatesIndexName), cancellationToken).ConfigureAwait(false);
+                await Client.CreateIndexAsync(IndexUtility.GetSnapshotOrArchiveCandidateValuesIndexDescriptor(ArchiveCandidatesIndexName), cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -275,12 +275,12 @@ namespace Aika.Elasticsearch {
         /// A task that will create the required Elasticsearch index if it does not already exists.
         /// </returns>
         private async Task CreateArchiveIndex(ElasticsearchTagDefinition tag, DateTime utcSampleTime, CancellationToken cancellationToken) {
-            var indexName = DocumentMappings.GetIndexNameForArchiveTagValue(ArchiveIndexNamePrefix, tag, utcSampleTime, ArchiveIndexSuffixGenerator);
+            var indexName = IndexUtility.GetIndexNameForArchiveTagValue(ArchiveIndexNamePrefix, tag, utcSampleTime, ArchiveIndexSuffixGenerator);
             if (_archiveIndices.ContainsKey(indexName)) {
                 return;
             }
 
-            var response = await Client.CreateIndexAsync(DocumentMappings.GetArchiveValuesIndexDescriptor(indexName), cancellationToken).ConfigureAwait(false);
+            var response = await Client.CreateIndexAsync(IndexUtility.GetArchiveValuesIndexDescriptor(indexName), cancellationToken).ConfigureAwait(false);
             if (response.IsValid) {
                 _archiveIndices[indexName] = new object();
             }
