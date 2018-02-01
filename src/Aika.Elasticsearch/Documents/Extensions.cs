@@ -241,6 +241,40 @@ namespace Aika.Elasticsearch.Documents {
 
 
         /// <summary>
+        /// Converts an Aika <see cref="ArchiveCandidateValue"/> into an Elasticsearch <see cref="TagValueDocument"/>.
+        /// </summary>
+        /// <param name="value">The Aika archive candidate value.</param>
+        /// <param name="tag">The tag that the value is for.</param>
+        /// <param name="documentId">
+        ///   The optional document ID to assign to the <see cref="TagValueDocument"/>.  Specify 
+        ///   <see langword="null"/> for archive values, and the tag ID for snapshot and archive 
+        ///   candidate values (so that the existing snapshot or archive candidate document for 
+        ///   the tag will be replaced).
+        /// </param>
+        /// <returns>
+        /// An equivalent <see cref="TagValueDocument"/>.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        public static TagValueDocument ToTagValueDocument(this ArchiveCandidateValue value, ElasticsearchTagDefinition tag, Guid? documentId) {
+            if (value == null) {
+                throw new ArgumentNullException(nameof(value));
+            }
+            if (tag == null) {
+                throw new ArgumentNullException(nameof(tag));
+            }
+
+            var val = value?.Value.ToTagValueDocument(tag, documentId);
+            val.Properties = new Dictionary<string, object>() {
+                { "CompressionAngleMinimum", value.CompressionAngleMinimum },
+                { "CompressionAngleMaximum", value.CompressionAngleMaximum }
+            };
+
+            return val;
+        }
+
+
+        /// <summary>
         /// Converts an Elasticsearch <see cref="TagValueDocument"/> into an Aika <see cref="TagValue"/>, 
         /// optionally overriding one or more of the tag value document's fields.
         /// </summary>
@@ -264,6 +298,35 @@ namespace Aika.Elasticsearch.Documents {
                                 textValue ?? value.TextValue, 
                                 quality ?? value.Quality, 
                                 units);
+        }
+
+
+        /// <summary>
+        /// Converts an Elasticsearch <see cref="TagValueDocument"/> into an Aika <see cref="ArchiveCandidateValue"/>.
+        /// </summary>
+        /// <param name="value">The value document.</param>
+        /// <param name="units">Specifies the tag units for the <see cref="TagValue"/> on the <see cref="ArchiveCandidateValue"/>.</param>
+        /// <returns>
+        /// An equivalent <see cref="ArchiveCandidateValue"/>.
+        /// </returns>
+        public static ArchiveCandidateValue ToArchiveCandidateValue(this TagValueDocument value, string units) {
+            if (value == null) {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            var val = value.ToTagValue(units: units);
+            var min = Double.NaN;
+            var max = Double.NaN;
+
+            object o = null;
+            if (value.Properties?.TryGetValue("CompressionAngleMinimum", out o) ?? false) {
+                min = Convert.ToDouble(o);
+            }
+            if (value.Properties?.TryGetValue("CompressionAngleMaximum", out o) ?? false) {
+                max = Convert.ToDouble(o);
+            }
+
+            return new ArchiveCandidateValue(val, min, max);
         }
 
     }

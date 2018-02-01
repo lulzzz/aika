@@ -226,7 +226,7 @@ namespace Aika.DataFilters {
         /// </summary>
         /// <param name="valuesToArchive">The values to send on for archiving.</param>
         /// <param name="nextArchiveCandidate">The updated next-archive candidate.</param>
-        private void OnCompressionFilterEmit(IEnumerable<TagValue> valuesToArchive, TagValue nextArchiveCandidate) {
+        private void OnCompressionFilterEmit(IEnumerable<TagValue> valuesToArchive, ArchiveCandidateValue nextArchiveCandidate) {
             var vals = valuesToArchive?.ToArray() ?? new TagValue[0];
 
             try {
@@ -502,16 +502,6 @@ namespace Aika.DataFilters {
             /// </summary>
             public DataFilter Filter { get; }
 
-            /// <summary>
-            /// Gets the maximum compression deviation limit to use in the compression filter for the <see cref="DataFilter"/>.
-            /// </summary>
-            public double CompressionMaximum { get; private set; }
-
-            /// <summary>
-            /// Gets the minimum compression deviation limit to use in the compression filter for the <see cref="DataFilter"/>.
-            /// </summary>
-            public double CompressionMinimum { get; private set; }
-
 
             /// <summary>
             /// Creates a new <see cref="CompressionMonitor"/> object.
@@ -582,8 +572,8 @@ namespace Aika.DataFilters {
                 var x = incoming.UtcSampleTime.Ticks;
 
                 var y0 = Filter.CompressionFilter.LastArchivedValue.NumericValue;
-                var y1_max = CompressionMaximum;
-                var y1_min = CompressionMinimum;
+                var y1_max = Filter.CompressionFilter.CompressionAngleMaximum;
+                var y1_min = Filter.CompressionFilter.CompressionAngleMinimum;
 
                 var y_max = y0 + (x - x0) * ((y1_max - y0) / (x1 - x0));
                 var y_min = y0 + (x - x0) * ((y1_min - y0) / (x1 - x0));
@@ -650,13 +640,13 @@ namespace Aika.DataFilters {
                     return true;
                 }
 
-                if (Double.IsNaN(CompressionMaximum)) {
+                if (Double.IsNaN(Filter.CompressionFilter.CompressionAngleMaximum)) {
                     reason = $"The current maximum compression slope value is {Double.NaN}.";
                     interpolatedCompressionLimits = null;
                     return true;
                 }
 
-                if (Double.IsNaN(CompressionMinimum)) {
+                if (Double.IsNaN(Filter.CompressionFilter.CompressionAngleMinimum)) {
                     reason = $"The current minimum compression slope value is {Double.NaN}.";
                     interpolatedCompressionLimits = null;
                     return true;
@@ -720,7 +710,7 @@ namespace Aika.DataFilters {
                                 new CompressionFilterResultDetails.CompressionLimits(
                                     Filter.CompressionFilter.LastArchivedValue == null
                                         ? null
-                                        : new CompressionFilterResultDetails.CompressionLimitSet(Filter.CompressionFilter.LastArchivedValue.UtcSampleTime, CompressionMinimum, CompressionMaximum),
+                                        : new CompressionFilterResultDetails.CompressionLimitSet(Filter.CompressionFilter.LastArchivedValue.UtcSampleTime, Filter.CompressionFilter.CompressionAngleMinimum, Filter.CompressionFilter.CompressionAngleMaximum),
                                     interpolatedCompressionLimits == null
                                         ? null
                                         : new CompressionFilterResultDetails.CompressionLimitSet(incoming.value.UtcSampleTime, interpolatedCompressionLimits.MinimumLimit, interpolatedCompressionLimits.MaximumLimit),
@@ -745,15 +735,17 @@ namespace Aika.DataFilters {
                             Filter.Log.LogTrace($"[{Filter.Name}] Adjusting compression slopes for next incoming value: Last Archived Value = {Filter.GetSampleValueForDisplay(Filter.CompressionFilter.LastArchivedValue)} @ {Filter.CompressionFilter.LastArchivedValue.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z , Compression Slope Min/Max = {calculatedCompressionLimits.MinimumLimit}/{calculatedCompressionLimits.MaximumLimit} @ {incoming.value.UtcSampleTime:yyyy-MM-ddTHH:mm:ss.fff}Z");
                         }
 
-                        Filter.CompressionFilter.LastReceivedValue = incoming.value;
-                        CompressionMaximum = calculatedCompressionLimits.MaximumLimit;
-                        CompressionMinimum = calculatedCompressionLimits.MinimumLimit;
+                        var archiveCandidate = new ArchiveCandidateValue(incoming.value, calculatedCompressionLimits.MinimumLimit, calculatedCompressionLimits.MaximumLimit);
+
+                        Filter.CompressionFilter.LastReceivedValue = archiveCandidate.Value;
+                        Filter.CompressionFilter.CompressionAngleMaximum = archiveCandidate.CompressionAngleMaximum;
+                        Filter.CompressionFilter.CompressionAngleMinimum = archiveCandidate.CompressionAngleMinimum;
 
                         if (valueToArchive != null) {
-                            Filter.OnCompressionFilterEmit(new[] { valueToArchive }, incoming.value);
+                            Filter.OnCompressionFilterEmit(new[] { valueToArchive }, archiveCandidate);
                         }
                         else {
-                            Filter.OnCompressionFilterEmit(null, incoming.value);
+                            Filter.OnCompressionFilterEmit(null, archiveCandidate);
                         }
 
                         return true;
@@ -791,7 +783,7 @@ namespace Aika.DataFilters {
                                 new CompressionFilterResultDetails.CompressionLimits(
                                     Filter.CompressionFilter.LastArchivedValue == null
                                         ? null
-                                        : new CompressionFilterResultDetails.CompressionLimitSet(Filter.CompressionFilter.LastArchivedValue.UtcSampleTime, CompressionMinimum, CompressionMaximum),
+                                        : new CompressionFilterResultDetails.CompressionLimitSet(Filter.CompressionFilter.LastArchivedValue.UtcSampleTime, Filter.CompressionFilter.CompressionAngleMinimum, Filter.CompressionFilter.CompressionAngleMaximum),
                                     interpolatedCompressionLimits == null
                                         ? null
                                         : new CompressionFilterResultDetails.CompressionLimitSet(incoming.value.UtcSampleTime, interpolatedCompressionLimits.MinimumLimit, interpolatedCompressionLimits.MaximumLimit),
@@ -800,11 +792,13 @@ namespace Aika.DataFilters {
                             )
                         );
 
-                        Filter.CompressionFilter.LastReceivedValue = incoming.value;
-                        CompressionMaximum = maxCompressionValueAtNewSnapshot;
-                        CompressionMinimum = minCompressionValueAtNewSnapshot;
+                        var archiveCandidate = new ArchiveCandidateValue(incoming.value, minCompressionValueAtNewSnapshot, maxCompressionValueAtNewSnapshot);
 
-                        Filter.OnCompressionFilterEmit(null, incoming.value);
+                        Filter.CompressionFilter.LastReceivedValue = archiveCandidate.Value;
+                        Filter.CompressionFilter.CompressionAngleMaximum = archiveCandidate.CompressionAngleMaximum;
+                        Filter.CompressionFilter.CompressionAngleMinimum = archiveCandidate.CompressionAngleMinimum;
+
+                        Filter.OnCompressionFilterEmit(null, archiveCandidate);
 
                         return false;
                     }

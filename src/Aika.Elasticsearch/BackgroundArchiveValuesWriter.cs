@@ -45,7 +45,7 @@ namespace Aika.Elasticsearch {
         /// <summary>
         /// The current state of the archive candidate values indexed by tag ID.
         /// </summary>
-        private readonly ConcurrentDictionary<Guid, TagValue> _archiveCandidateValues = new ConcurrentDictionary<Guid, TagValue>();
+        private readonly ConcurrentDictionary<Guid, ArchiveCandidateValue> _archiveCandidateValues = new ConcurrentDictionary<Guid, ArchiveCandidateValue>();
 
         /// <summary>
         /// Locks access to <see cref="_nextInsert"/> and <see cref="_archiveCandidateValues"/> when a 
@@ -86,7 +86,7 @@ namespace Aika.Elasticsearch {
         /// <param name="tag">The tag that the values are being written for.</param>
         /// <param name="values">The values to write to the archive.</param>
         /// <param name="archiveCandidate">The current archive candidate value for the tag.</param>
-        internal void WriteValues(ElasticsearchTagDefinition tag, IEnumerable<TagValue> values, TagValue archiveCandidate) {
+        internal void WriteValues(ElasticsearchTagDefinition tag, IEnumerable<TagValue> values, ArchiveCandidateValue archiveCandidate) {
             _valuesLock.EnterReadLock();
             try {
                 foreach (var value in values ?? new TagValue[0]) {
@@ -127,7 +127,7 @@ namespace Aika.Elasticsearch {
                 }
 
                 BulkDescriptor descriptor;
-                IDictionary<Guid, TagValue> values;
+                IDictionary<Guid, ArchiveCandidateValue> values;
                 bool dirty = _writeOperationsPending;
 
                 _valuesLock.EnterWriteLock();

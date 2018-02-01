@@ -52,7 +52,7 @@ namespace Aika.Historians {
         }
 
 
-        protected override Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, TagValue nextArchiveCandidate, CancellationToken cancellationToken) {
+        protected override Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, ArchiveCandidateValue nextArchiveCandidate, CancellationToken cancellationToken) {
             _historian.SaveArchiveCandidateValue(Id, nextArchiveCandidate);
             var result = !(values?.Any() ?? false) 
                 ? WriteTagValuesResult.CreateEmptyResult() 

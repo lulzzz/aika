@@ -4,5 +4,5 @@ using System.Text;
 using Aika.Tags;
 
 namespace Aika.DataFilters {
-    public delegate void CompressionFilterOutputDelegate(TagValue[] valuesToArchive, TagValue nextArchiveCandidate);
+    public delegate void CompressionFilterOutputDelegate(TagValue[] valuesToArchive, ArchiveCandidateValue nextArchiveCandidate);
 }

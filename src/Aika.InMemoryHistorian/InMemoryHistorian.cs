@@ -23,7 +23,7 @@ namespace Aika.Historians {
 
         private static readonly ConcurrentDictionary<string, RawDataSet> _archive = new ConcurrentDictionary<string, RawDataSet>(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly ConcurrentDictionary<string, TagValue> _archiveCandidates = new ConcurrentDictionary<string, TagValue>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, ArchiveCandidateValue> _archiveCandidates = new ConcurrentDictionary<string, ArchiveCandidateValue>(StringComparer.OrdinalIgnoreCase);
 
         private const int MaxRawSampleCount = 5000;
 
@@ -51,26 +51,26 @@ namespace Aika.Historians {
                 switch (clause.Field) {
                     case TagDefinitionFilterField.Name:
                         if (filter.FilterType == TagDefinitionFilterJoinType.And) {
-                            result = result.Where(x => x.Name.Contains(clause.Value));
+                            result = result.Where(x => x.Name.Like(clause.Value));
                         }
                         else {
-                            result = result.Concat(allTags.Where(x => x.Name.Contains(clause.Value)));
+                            result = result.Concat(allTags.Where(x => x.Name.Like(clause.Value)));
                         }
                         break;
                     case TagDefinitionFilterField.Description:
                         if (filter.FilterType == TagDefinitionFilterJoinType.And) {
-                            result = result.Where(x => x.Description?.Contains(clause.Value) ?? false);
+                            result = result.Where(x => x.Description?.Like(clause.Value) ?? false);
                         }
                         else {
-                            result = result.Concat(allTags.Where(x => x.Description?.Contains(clause.Value) ?? false));
+                            result = result.Concat(allTags.Where(x => x.Description?.Like(clause.Value) ?? false));
                         }
                         break;
                     case TagDefinitionFilterField.Units:
                         if (filter.FilterType == TagDefinitionFilterJoinType.And) {
-                            result = result.Where(x => x.Units?.Contains(clause.Value) ?? false);
+                            result = result.Where(x => x.Units?.Like(clause.Value) ?? false);
                         }
                         else {
-                            result = result.Concat(allTags.Where(x => x.Units?.Contains(clause.Value) ?? false));
+                            result = result.Concat(allTags.Where(x => x.Units?.Like(clause.Value) ?? false));
                         }
                         break;
                 }
@@ -127,8 +127,8 @@ namespace Aika.Historians {
                         : MaxRawSampleCount;
 
                     var nonArchiveValues = new List<TagValue>();
-                    if (_archiveCandidates.TryGetValue(tag.Id, out var candidate) && candidate != null) {
-                        nonArchiveValues.Add(candidate);
+                    if (_archiveCandidates.TryGetValue(tag.Id, out var candidate) && candidate?.Value != null) {
+                        nonArchiveValues.Add(candidate.Value);
                     }
                     var snapshot = tag.SnapshotValue;
                     if (snapshot != null) {
@@ -186,7 +186,7 @@ namespace Aika.Historians {
         }
 
 
-        internal void SaveArchiveCandidateValue(string tagId, TagValue value) {
+        internal void SaveArchiveCandidateValue(string tagId, ArchiveCandidateValue value) {
             _archiveCandidates[tagId] = value;
         }
 

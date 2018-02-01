@@ -55,7 +55,7 @@ namespace Aika.Elasticsearch {
         /// written in bulk, it is possible that write operations can fail after this method has 
         /// returned.
         /// </returns>
-        protected override Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, TagValue nextArchiveCandidate, CancellationToken cancellationToken) {
+        protected override Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, ArchiveCandidateValue nextArchiveCandidate, CancellationToken cancellationToken) {
             return _historian.InsertArchiveValues(this, values, nextArchiveCandidate, cancellationToken);
         }
 

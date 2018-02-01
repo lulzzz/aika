@@ -168,26 +168,26 @@ namespace Aika.Redis {
                 switch (clause.Field) {
                     case TagDefinitionFilterField.Name:
                         if (filter.FilterType == TagDefinitionFilterJoinType.And) {
-                            result = result.Where(x => x.Name.Contains(clause.Value));
+                            result = result.Where(x => x.Name.Like(clause.Value));
                         }
                         else {
-                            result = result.Concat(allTags.Where(x => x.Name.Contains(clause.Value)));
+                            result = result.Concat(allTags.Where(x => x.Name.Like(clause.Value)));
                         }
                         break;
                     case TagDefinitionFilterField.Description:
                         if (filter.FilterType == TagDefinitionFilterJoinType.And) {
-                            result = result.Where(x => x.Description?.Contains(clause.Value) ?? false);
+                            result = result.Where(x => x.Description?.Like(clause.Value) ?? false);
                         }
                         else {
-                            result = result.Concat(allTags.Where(x => x.Description?.Contains(clause.Value) ?? false));
+                            result = result.Concat(allTags.Where(x => x.Description?.Like(clause.Value) ?? false));
                         }
                         break;
                     case TagDefinitionFilterField.Units:
                         if (filter.FilterType == TagDefinitionFilterJoinType.And) {
-                            result = result.Where(x => x.Units?.Contains(clause.Value) ?? false);
+                            result = result.Where(x => x.Units?.Like(clause.Value) ?? false);
                         }
                         else {
-                            result = result.Concat(allTags.Where(x => x.Units?.Contains(clause.Value) ?? false));
+                            result = result.Concat(allTags.Where(x => x.Units?.Like(clause.Value) ?? false));
                         }
                         break;
                 }

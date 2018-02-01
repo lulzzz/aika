@@ -19,10 +19,22 @@ namespace Aika.Tags {
         public TagValue LastArchivedValue { get; }
 
         /// <summary>
-        /// Gets the value that will be sent for permanent archiving the next time an incoming tag 
-        /// value passes the tag's exception and compression filter tests.
+        /// Gets the last value to pass the tag's exception filter.  Can be <see langword="null"/>.
         /// </summary>
-        public TagValue NextArchiveCandidateValue { get; }
+        public TagValue LastExceptionValue { get; }
+
+        /// <summary>
+        /// Gets the minimum compression angle value, calculated when <see cref="LastExceptionValue"/> 
+        /// was passed to the compression filter.
+        /// </summary>
+        public double CompressionAngleMinimum { get; }
+
+        /// <summary>
+        /// Gets the maximum compression angle value, calculated when <see cref="LastExceptionValue"/> 
+        /// was passed to the compression filter.
+        /// </summary>
+        public double CompressionAngleMaximum { get; }
+
 
 
         /// <summary>
@@ -34,14 +46,23 @@ namespace Aika.Tags {
         /// <param name="lastArchivedValue">
         ///   The most-recent value to be permanently archived for the tag.  Can be <see langword="null"/>.
         /// </param>
-        /// <param name="nextArchiveCandidateValue">T
-        ///   The value that will be sent for permanent archiving the next time an incoming tag value 
-        ///   passes the tag's exception and compression filter tests.
+        /// <param name="lastExceptionValue">
+        ///   The last value that passed the tag data filter's exception filter.
         /// </param>
-        public InitialTagValues(TagValue snapshotValue, TagValue lastArchivedValue, TagValue nextArchiveCandidateValue) {
+        /// <param name="compressionAngleMinimum">
+        ///   The minimum compression angle value, calculated when <see cref="LastExceptionValue"/> was 
+        ///   passed to the compression filter.
+        /// </param>
+        /// <param name="compressionAngleMaximum">
+        ///   The maximum compression angle value, calculated when <see cref="LastExceptionValue"/> was 
+        ///   passed to the compression filter.
+        /// </param>
+        public InitialTagValues(TagValue snapshotValue, TagValue lastArchivedValue, TagValue lastExceptionValue, double compressionAngleMinimum, double compressionAngleMaximum) {
             SnapshotValue = snapshotValue;
             LastArchivedValue = lastArchivedValue;
-            NextArchiveCandidateValue = nextArchiveCandidateValue;
+            LastExceptionValue = lastExceptionValue;
+            CompressionAngleMinimum = compressionAngleMinimum;
+            CompressionAngleMaximum = compressionAngleMaximum;
         }
 
     }

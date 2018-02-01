@@ -49,6 +49,18 @@ namespace Aika.DataFilters {
         public TagValue LastReceivedValue { get; internal set; }
 
         /// <summary>
+        /// Gets the minimum compression angle value, calculated when <see cref="LastReceivedValue"/> 
+        /// was passed to the compression filter.
+        /// </summary>
+        public double CompressionAngleMinimum { get; internal set; }
+
+        /// <summary>
+        /// Gets the maximum compression angle value, calculated when <see cref="LastReceivedValue"/> 
+        /// was passed to the compression filter.
+        /// </summary>
+        public double CompressionAngleMaximum { get; internal set; }
+
+        /// <summary>
         /// The results of the processing that the compression filter performed on its 
         /// most-recently-received value.
         /// </summary>
@@ -60,7 +72,7 @@ namespace Aika.DataFilters {
         /// </summary>
         public CompressionFilterResult LastResult {
             get { return _lastResult; }
-            set {
+            internal set {
                 _lastResult = value;
                 if (_lastResult != null) {
                     ValueProcessed?.Invoke(_lastResult);
@@ -94,9 +106,17 @@ namespace Aika.DataFilters {
         ///   are not set, the compression filter will require multiple incoming values to be passed to 
         ///   it before it starts applying the compression rules as expected.
         /// </param>
+        /// <param name="compressionMinimum">
+        ///   The minimum compression angle value, calculated when <paramref name="lastReceivedValue"/>
+        ///   was passed to the compression filter.
+        /// </param>
+        /// <param name="compressionMaximum">
+        ///   The minimum compression angle value, calculated when <paramref name="lastReceivedValue"/>
+        ///   was passed to the compression filter.
+        /// </param>
         /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="lastArchivedValue"/> and <paramref name="lastReceivedValue"/> are both defined, and <paramref name="lastArchivedValue"/> has a sample time that is greater than <paramref name="lastReceivedValue"/>.</exception>
-        public CompressionFilterState(TagValueFilterSettings settings, TagValue lastArchivedValue, TagValue lastReceivedValue) {
+        public CompressionFilterState(TagValueFilterSettings settings, TagValue lastArchivedValue, TagValue lastReceivedValue, double compressionMinimum, double compressionMaximum) {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
             if (lastArchivedValue != null && lastReceivedValue != null && lastArchivedValue.UtcSampleTime > lastReceivedValue.UtcSampleTime) {
@@ -105,6 +125,8 @@ namespace Aika.DataFilters {
 
             LastArchivedValue = lastArchivedValue;
             LastReceivedValue = lastReceivedValue;
+            CompressionAngleMinimum = compressionMinimum;
+            CompressionAngleMaximum = compressionMaximum;
         }
 
     }

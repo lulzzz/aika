@@ -42,5 +42,10 @@ namespace Aika.Elasticsearch.Documents {
         /// </summary>
         public TagValueQuality Quality { get; set; }
 
+        /// <summary>
+        /// Gets or sets additional properties associated with the value.
+        /// </summary>
+        public IDictionary<string, object> Properties { get; set; }
+
     }
 }

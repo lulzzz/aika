@@ -353,12 +353,14 @@ namespace Aika.Elasticsearch {
                             archiveCandidateValuesTask.Result.TryGetValue(hit.Source.Id, out var archiveCandidate);
                             var lastArchived = await LoadLastArchivedValueFromElasticsearch(hit.Source.Id, archiveIndexNames, cancellationToken).ConfigureAwait(false);
 
+                            var archiveCandidateActual = archiveCandidate?.ToArchiveCandidateValue(settings.Units) ?? null;
+
                             var tag = new ElasticsearchTagDefinition(this,
                                                                hit.Source.Id,
                                                                settings,
                                                                metadata,
                                                                hit.Source.Security.ToTagSecurity(),
-                                                               new InitialTagValues(snapshot?.ToTagValue(units: settings.Units), lastArchived?.ToTagValue(units: settings.Units), archiveCandidate?.ToTagValue(units: settings.Units)),
+                                                               new InitialTagValues(snapshot?.ToTagValue(units: settings.Units), lastArchived?.ToTagValue(units: settings.Units), archiveCandidateActual?.Value, archiveCandidateActual?.CompressionAngleMinimum ?? Double.NaN, archiveCandidateActual?.CompressionAngleMaximum ?? Double.NaN),
                                                                null);
 
                             _tagsById[tag.Id] = tag;
@@ -1918,8 +1920,8 @@ namespace Aika.Elasticsearch {
         /// The write result.  Note that, since writing to the archive is performed in the background, 
         /// the result does not reflect the final written states of the values.
         /// </returns>
-        internal async Task<WriteTagValuesResult> InsertArchiveValues(ElasticsearchTagDefinition tag, IEnumerable<TagValue> values, TagValue nextArchiveCandidate, CancellationToken cancellationToken) {
-            foreach (var value in (values ?? new TagValue[0]).Concat(new[] { nextArchiveCandidate })) {
+        internal async Task<WriteTagValuesResult> InsertArchiveValues(ElasticsearchTagDefinition tag, IEnumerable<TagValue> values, ArchiveCandidateValue nextArchiveCandidate, CancellationToken cancellationToken) {
+            foreach (var value in (values ?? new TagValue[0]).Concat(new[] { nextArchiveCandidate?.Value })) {
                 if (value == null) {
                     continue;
                 }

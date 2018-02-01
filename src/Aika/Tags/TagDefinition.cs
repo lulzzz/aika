@@ -181,7 +181,7 @@ namespace Aika.Tags {
             }
 
             _snapshotValue = initialTagValues?.SnapshotValue;
-            DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, _snapshotValue), new CompressionFilterState(compressionFilterSettings, initialTagValues?.LastArchivedValue, initialTagValues?.NextArchiveCandidateValue), _historian.LoggerFactory);
+            DataFilter = new DataFilter(Name, new ExceptionFilterState(exceptionFilterSettings, _snapshotValue), new CompressionFilterState(compressionFilterSettings, initialTagValues?.LastArchivedValue, initialTagValues?.LastExceptionValue, initialTagValues?.CompressionAngleMinimum ?? Double.NaN, initialTagValues?.CompressionAngleMaximum ?? Double.NaN), _historian.LoggerFactory);
             DataFilter.Emit += (values, nextArchiveCandidate) => {
                 if (values.Length > 0 && _logger.IsEnabled(LogLevel.Trace)) {
                     _logger.LogTrace($"[{Name}] Archiving {values.Count()} values emitted by the compression filter.");
@@ -383,7 +383,7 @@ namespace Aika.Tags {
         /// A task that will return the write result.
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
-        private async Task<WriteTagValuesResult> InsertArchiveValuesInternal(ClaimsPrincipal identity, IEnumerable<TagValue> values, TagValue nextArchiveCandidate, bool validate, CancellationToken cancellationToken) {
+        private async Task<WriteTagValuesResult> InsertArchiveValuesInternal(ClaimsPrincipal identity, IEnumerable<TagValue> values, ArchiveCandidateValue nextArchiveCandidate, bool validate, CancellationToken cancellationToken) {
             if (!values?.Any() ?? false) {
                 await InsertArchiveValues(null, nextArchiveCandidate, cancellationToken).ConfigureAwait(false);
                 return WriteTagValuesResult.CreateEmptyResult();
@@ -426,7 +426,7 @@ namespace Aika.Tags {
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         public async Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
-            return await InsertArchiveValuesInternal(identity, values, DataFilter.CompressionFilter.LastReceivedValue, true, cancellationToken).ConfigureAwait(false);
+            return await InsertArchiveValuesInternal(identity, values, null, true, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -450,7 +450,7 @@ namespace Aika.Tags {
         /// <returns>
         /// The result of the insert.
         /// </returns>
-        protected abstract Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, TagValue nextArchiveCandidate, CancellationToken cancellationToken);
+        protected abstract Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, ArchiveCandidateValue nextArchiveCandidate, CancellationToken cancellationToken);
 
 
         /// <summary>
@@ -551,7 +551,7 @@ namespace Aika.Tags {
             /// <summary>
             /// The value to write as the next archive candidate.
             /// </summary>
-            public TagValue NextArchiveCandidate { get; set; }
+            public ArchiveCandidateValue NextArchiveCandidate { get; set; }
 
         }
 

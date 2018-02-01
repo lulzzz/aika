@@ -58,7 +58,7 @@ namespace Aika.Redis {
         /// permanently to the archive if the next incoming value passed both the exception and 
         /// compression filter tests for the tag.
         /// </summary>
-        private TagValue _archiveCandidateValue;
+        private ArchiveCandidateValue _archiveCandidateValue;
 
         /// <summary>
         /// The maximum number of raw samples to retrieve per query.
@@ -82,7 +82,7 @@ namespace Aika.Redis {
             _archiveKey = _historian.GetKeyForRawData(Id);
             _archiveCandidateKey = _historian.GetKeyForArchiveCandidateData(Id);
 
-            _archiveCandidateValue = initialTagValues?.NextArchiveCandidateValue;
+            _archiveCandidateValue = new ArchiveCandidateValue(initialTagValues?.LastExceptionValue, initialTagValues?.CompressionAngleMinimum ?? Double.NaN, initialTagValues?.CompressionAngleMaximum ?? Double.NaN);
 
             Updated += TagUpdated;
         }
@@ -129,7 +129,7 @@ namespace Aika.Redis {
         /// <returns>
         /// A task that will return the write result.
         /// </returns>
-        protected override async Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, TagValue nextArchiveCandidate, CancellationToken cancellationToken) {
+        protected override async Task<WriteTagValuesResult> InsertArchiveValues(IEnumerable<TagValue> values, ArchiveCandidateValue nextArchiveCandidate, CancellationToken cancellationToken) {
             await SaveArchiveCandidateValueInternal(nextArchiveCandidate, cancellationToken).ConfigureAwait(false);
             await SaveArchiveValues(values, cancellationToken).ConfigureAwait(false);
             return new WriteTagValuesResult(true, values?.Count() ?? 0, values?.FirstOrDefault()?.UtcSampleTime, values?.LastOrDefault()?.UtcSampleTime, null);
@@ -366,7 +366,7 @@ namespace Aika.Redis {
             await Task.WhenAll(snapshotTask, lastArchivedTask, archiveCandidateTask).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
-            var initialValues = new InitialTagValues(snapshotTask.Result, lastArchivedTask.Result, archiveCandidateTask.Result);
+            var initialValues = new InitialTagValues(snapshotTask.Result, lastArchivedTask.Result, archiveCandidateTask.Result.Value, archiveCandidateTask.Result.CompressionAngleMinimum, archiveCandidateTask.Result.CompressionAngleMaximum);
 
             var result = new RedisTagDefinition(historian,
                                                 tagId,
@@ -484,6 +484,26 @@ namespace Aika.Redis {
 
 
         /// <summary>
+        /// Converts an <see cref="ArchiveCandidateValue"/> into a set of <see cref="HashEntry"/> objects to write to Redis.
+        /// </summary>
+        /// <param name="value">The archive candidate tag value.</param>
+        /// <returns>
+        /// The equivalent Redis hash entries.
+        /// </returns>
+        private HashEntry[] GetHashEntriesForArchiveCandidateValue(ArchiveCandidateValue value) {
+            if (value == null) {
+                return new HashEntry[0];
+            }
+
+            var tagValueHashEntries = GetHashEntriesForTagValue(value.Value);
+            return tagValueHashEntries.Concat(new[] {
+                new HashEntry("MI", value.CompressionAngleMinimum),
+                new HashEntry("MA", value.CompressionAngleMaximum)
+            }).ToArray();
+        }
+
+
+        /// <summary>
         /// Converts a set of Redis <see cref="HashEntry"/> objects back into a <see cref="TagValue"/>.
         /// </summary>
         /// <param name="values">The Redis hash entries containing the tag value details.</param>
@@ -518,6 +538,26 @@ namespace Aika.Redis {
             }
 
             return new TagValue(utcSampleTime, numericValue, textValue, quality, units);
+        }
+
+
+        private static ArchiveCandidateValue GetArchiveCandidateValueFromHashValues(HashEntry[] values) {
+            var value = GetTagValueFromHashValues(values);
+            var min = Double.NaN;
+            var max = Double.NaN;
+
+            foreach (var item in values) {
+                switch (item.Name.ToString()) {
+                    case "MI":
+                        min = (double) item.Value;
+                        break;
+                    case "MA":
+                        max = (double) item.Value;
+                        break;
+                }
+            }
+
+            return new ArchiveCandidateValue(value, min, max);
         }
 
 
@@ -568,7 +608,7 @@ namespace Aika.Redis {
         /// <returns>
         /// A task that will return the archive candidate value.
         /// </returns>
-        private static async Task<TagValue> LoadArchiveCandidateValue(RedisHistorian historian, string tagId, CancellationToken cancellationToken) {
+        private static async Task<ArchiveCandidateValue> LoadArchiveCandidateValue(RedisHistorian historian, string tagId, CancellationToken cancellationToken) {
             var key = historian.GetKeyForArchiveCandidateData(tagId);
             var valuesTask = historian.Connection.GetDatabase().HashGetAllAsync(key);
             await Task.WhenAny(valuesTask, Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
@@ -578,7 +618,7 @@ namespace Aika.Redis {
                 return null;
             }
 
-            return GetTagValueFromHashValues(valuesTask.Result);
+            return GetArchiveCandidateValueFromHashValues(valuesTask.Result);
         }
 
 
@@ -590,10 +630,10 @@ namespace Aika.Redis {
         /// <returns>
         /// A task that will save the archive candidate value.
         /// </returns>
-        private async Task SaveArchiveCandidateValueInternal(TagValue value, CancellationToken cancellationToken) {
-            if (_archiveCandidateValue == null || (value != null && value.UtcSampleTime > _archiveCandidateValue.UtcSampleTime)) {
+        private async Task SaveArchiveCandidateValueInternal(ArchiveCandidateValue value, CancellationToken cancellationToken) {
+            if (_archiveCandidateValue?.Value == null || (value?.Value != null && value.Value.UtcSampleTime > _archiveCandidateValue.Value.UtcSampleTime)) {
                 _archiveCandidateValue = value;
-                await Task.WhenAny(_historian.Connection.GetDatabase().HashSetAsync(_archiveCandidateKey, GetHashEntriesForTagValue(value)),
+                await Task.WhenAny(_historian.Connection.GetDatabase().HashSetAsync(_archiveCandidateKey, GetHashEntriesForArchiveCandidateValue(value)),
                                    Task.Delay(-1, cancellationToken)).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
             }
@@ -723,8 +763,8 @@ namespace Aika.Redis {
             var archiveCandidate = _archiveCandidateValue;
             var snapshot = SnapshotValue;
 
-            if (rawSampleValues.Length < sampleCount && (archiveCandidate?.UtcSampleTime ?? DateTime.MaxValue) <= utcEndTime) {
-                nonArchiveValues.Add(archiveCandidate);
+            if (rawSampleValues.Length < sampleCount && (archiveCandidate?.Value?.UtcSampleTime ?? DateTime.MaxValue) <= utcEndTime) {
+                nonArchiveValues.Add(archiveCandidate.Value);
             }
             if ((rawSampleValues.Length + nonArchiveValues.Count) < sampleCount && (snapshot?.UtcSampleTime ?? DateTime.MaxValue) <= utcEndTime) {
                 nonArchiveValues.Add(snapshot);
