@@ -70,7 +70,7 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            var distinctTagNames = tagNames?.Where(x => String.IsNullOrWhiteSpace(x))
+            var distinctTagNames = tagNames?.Where(x => !String.IsNullOrWhiteSpace(x))
                                             .Select(x => x.Trim())
                                             .Distinct(StringComparer.OrdinalIgnoreCase)
                                             .ToArray();
@@ -126,7 +126,7 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            var distinctTagNames = tagNames?.Where(x => String.IsNullOrWhiteSpace(x))
+            var distinctTagNames = tagNames?.Where(x => !String.IsNullOrWhiteSpace(x))
                                             .Select(x => x.Trim())
                                             .Distinct(StringComparer.OrdinalIgnoreCase)
                                             .ToArray();
