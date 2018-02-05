@@ -52,7 +52,7 @@ namespace Aika.AspNetCore.Controllers.Configuration {
             }
 
             try {
-                var result = await _historian.GetTags(User, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.FindTags(User, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
                 return Ok(result.Select(x => x.ToTagDefinitionExtendedDto()).ToArray()); // 200
             }
             catch (ArgumentException) {

@@ -152,7 +152,7 @@ namespace Aika {
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="filter"/> is <see langword="null"/>.</exception>
-        public async Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+        public async Task<IEnumerable<TagDefinition>> FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
             ThrowIfNotReady();
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
@@ -161,7 +161,7 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(filter));
             }
 
-            var result = await RunWithImmediateCancellation(_historian.GetTags(identity, filter, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var result = await RunWithImmediateCancellation(_historian.FindTags(identity, filter, cancellationToken), cancellationToken).ConfigureAwait(false);
             return result;
         }
 

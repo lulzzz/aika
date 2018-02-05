@@ -98,7 +98,7 @@ namespace Aika.Client.Clients {
                 connectionBuilder.WithUrl($"{_client.HttpClient.BaseAddress}/hubs/snapshot");
             }
 
-            _hubConnection = connectionBuilder.Build();
+            _hubConnection = connectionBuilder.WithMessagePackProtocol().Build();
 
             _hubConnection.Connected += () => {
                 IsConnected = true;

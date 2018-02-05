@@ -136,8 +136,8 @@ namespace Aika {
         /// <returns>
         /// A collection of matching tags.
         /// </returns>
-        async Task<IEnumerable<TagDefinition>> IHistorian.GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
-            return await GetTags(identity, filter, cancellationToken).ConfigureAwait(false);
+        async Task<IEnumerable<TagDefinition>> IHistorian.FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+            return await FindTags(identity, filter, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -150,7 +150,7 @@ namespace Aika {
         /// <returns>
         /// A collection of matching tags.
         /// </returns>
-        protected abstract Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken);
+        protected abstract Task<IEnumerable<TagDefinition>> FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken);
 
 
         /// <summary>

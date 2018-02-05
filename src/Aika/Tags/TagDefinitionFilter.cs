@@ -46,9 +46,17 @@ namespace Aika.Tags {
         public TagDefinitionFilterJoinType FilterType { get; set; }
 
         /// <summary>
+        /// The filter clauses.
+        /// </summary>
+        private IEnumerable<TagDefinitionFilterClause> _filterClauses = new TagDefinitionFilterClause[0];
+
+        /// <summary>
         /// Gets or sets the filter clauses.
         /// </summary>
-        public IEnumerable<TagDefinitionFilterClause> FilterClauses { get; set; }
+        public IEnumerable<TagDefinitionFilterClause> FilterClauses {
+            get { return _filterClauses; }
+            set { _filterClauses = value ?? new TagDefinitionFilterClause[0]; }
+        }
 
 
         /// <summary>

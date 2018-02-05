@@ -573,7 +573,7 @@ namespace Aika.Elasticsearch {
         /// <returns>
         /// A task that will return the matching tags.
         /// </returns>
-        protected override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+        protected override Task<IEnumerable<TagDefinition>> FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
             var result = filter?.GetMatchingTags(_tagsById.Values, null) ?? new TagDefinition[0];
             return Task.FromResult(result);
         }

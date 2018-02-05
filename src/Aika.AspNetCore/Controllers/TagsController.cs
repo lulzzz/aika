@@ -47,13 +47,13 @@ namespace Aika.AspNetCore.Controllers {
         [HttpPost]
         [Route("")]
         [ProducesResponseType(200, Type = typeof(IEnumerable<TagDefinitionDto>))]
-        public async Task<IActionResult> GetTags([FromBody] TagSearchRequest request, CancellationToken cancellationToken) {
+        public async Task<IActionResult> FindTags([FromBody] TagSearchRequest request, CancellationToken cancellationToken) {
             if (!ModelState.IsValid) {
                 return BadRequest(ModelState); // 400
             }
             
             try {
-                var result = await _historian.GetTags(User, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
+                var result = await _historian.FindTags(User, request.ToTagDefinitionFilter(), cancellationToken).ConfigureAwait(false);
                 return Ok(result.Select(x => x.ToTagDefinitionDto()).ToArray()); // 200
             }
             catch (ArgumentException) {
@@ -89,7 +89,7 @@ namespace Aika.AspNetCore.Controllers {
         [HttpGet]
         [Route("")]
         [ProducesResponseType(200, Type = typeof(IEnumerable<TagDefinitionDto>))]
-        public Task<IActionResult> GetTags(CancellationToken cancellationToken, string name = null, string description = null, string units = null, int pageSize = 10, int page = 1) {
+        public Task<IActionResult> FindTags(CancellationToken cancellationToken, string name = null, string description = null, string units = null, int pageSize = 10, int page = 1) {
             var model = new TagSearchRequest() {
                 Name = name,
                 Description = description,
@@ -100,7 +100,7 @@ namespace Aika.AspNetCore.Controllers {
             };
 
             TryValidateModel(model);
-            return GetTags(model, cancellationToken);
+            return FindTags(model, cancellationToken);
         }
 
 

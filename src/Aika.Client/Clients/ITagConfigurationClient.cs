@@ -21,7 +21,7 @@ namespace Aika.Client.Clients {
         /// <returns>
         /// A task that will return the matching tag definitions.
         /// </returns>
-        Task<IEnumerable<TagDefinitionExtendedDto>> GetTags(TagSearchRequest filter, CancellationToken cancellationToken);
+        Task<IEnumerable<TagDefinitionExtendedDto>> FindTags(TagSearchRequest filter, CancellationToken cancellationToken);
 
 
         /// <summary>

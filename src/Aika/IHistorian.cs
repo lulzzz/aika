@@ -57,7 +57,7 @@ namespace Aika {
         /// <returns>
         /// A collection of matching tags.
         /// </returns>
-        Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken);
+        Task<IEnumerable<TagDefinition>> FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken);
 
 
         /// <summary>

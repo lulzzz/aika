@@ -17,13 +17,13 @@ namespace Aika.Historians {
     /// </summary>
     public sealed class InMemoryHistorian : HistorianBase {
 
-        private static readonly ConcurrentDictionary<string, InMemoryTagDefinition> _tags = new ConcurrentDictionary<string, InMemoryTagDefinition>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, InMemoryTagDefinition> _tags = new ConcurrentDictionary<string, InMemoryTagDefinition>(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly ConcurrentDictionary<string, StateSet> _stateSets = new ConcurrentDictionary<string, StateSet>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, StateSet> _stateSets = new ConcurrentDictionary<string, StateSet>(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly ConcurrentDictionary<string, RawDataSet> _archive = new ConcurrentDictionary<string, RawDataSet>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, RawDataSet> _archive = new ConcurrentDictionary<string, RawDataSet>(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly ConcurrentDictionary<string, ArchiveCandidateValue> _archiveCandidates = new ConcurrentDictionary<string, ArchiveCandidateValue>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, ArchiveCandidateValue> _archiveCandidates = new ConcurrentDictionary<string, ArchiveCandidateValue>(StringComparer.OrdinalIgnoreCase);
 
         private const int MaxRawSampleCount = 5000;
 
@@ -41,7 +41,7 @@ namespace Aika.Historians {
         }
 
 
-        protected override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+        protected override Task<IEnumerable<TagDefinition>> FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
             IEnumerable<TagDefinition> allTags = _tags.Values;
             var result = filter.FilterType == TagDefinitionFilterJoinType.And
                 ? (IEnumerable<TagDefinition>) _tags.Values

@@ -158,7 +158,7 @@ namespace Aika.Redis {
         /// <returns>
         /// A collection of matching tags.
         /// </returns>
-        protected override Task<IEnumerable<TagDefinition>> GetTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+        protected override Task<IEnumerable<TagDefinition>> FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
             IEnumerable<TagDefinition> allTags = _tags.Values;
             var result = filter.FilterType == TagDefinitionFilterJoinType.And
                 ? (IEnumerable<TagDefinition>) _tags.Values
