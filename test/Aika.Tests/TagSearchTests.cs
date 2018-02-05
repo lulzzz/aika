@@ -92,6 +92,23 @@ namespace Aika.Tests {
 
 
         [Fact]
+        public async Task FindTags_ShouldFailWhenHistorianIsNotInitialized() {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => {
+                var historian = _fixture.CreateHistorian();
+                return historian.FindTags(Identities.GetTestIdentity(),
+                                           new TagDefinitionFilter() {
+                                               FilterClauses = new[] {
+                                                   new TagDefinitionFilterClause() {
+                                                       Field = TagDefinitionFilterField.Name,
+                                                       Value = "*"
+                                                   }
+                                               }
+                                           }, CancellationToken.None);
+            }).ConfigureAwait(false);
+        }
+
+
+        [Fact]
         public async Task FindTags_ShouldFailWhenIdentityIsNull() {
             await Assert.ThrowsAsync<ArgumentNullException>(() => {
                 return _fixture.Historian.FindTags(null,
@@ -128,6 +145,15 @@ namespace Aika.Tests {
         public async Task GetTags_ShouldReturnTagsById() {
             var tags = await _fixture.Historian.GetTags(Identities.GetTestIdentity(), _fixture.TagMap.Keys, CancellationToken.None).ConfigureAwait(false);
             Assert.Equal(2, tags.Count);
+        }
+
+
+        [Fact]
+        public async Task GetTags_ShouldFailWhenHistorianIsNotInitialized() {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => {
+                var historian = _fixture.CreateHistorian();
+                return historian.GetTags(Identities.GetTestIdentity(), new[] { "First_Test_Tag", "Second_Test_Tag" }, CancellationToken.None);
+            }).ConfigureAwait(false);
         }
 
 

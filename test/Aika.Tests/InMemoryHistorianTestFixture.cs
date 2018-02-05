@@ -13,9 +13,14 @@ namespace Aika.Tests
 
 
         public InMemoryHistorianTestFixture() {
+            Historian = CreateHistorian();
+        }
+
+
+        internal AikaHistorian CreateHistorian() {
             // TODO: include logging.
             var taskRunner = new DefaultTaskRunner(null);
-            Historian = new AikaHistorian(new Aika.Historians.InMemoryHistorian(taskRunner, null), null);
+            return new AikaHistorian(new Aika.Historians.InMemoryHistorian(taskRunner, null), null);
         }
 
 

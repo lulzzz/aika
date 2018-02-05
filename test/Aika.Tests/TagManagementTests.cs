@@ -39,16 +39,30 @@ namespace Aika.Tests {
 
 
         [Fact]
-        public async Task CreateTag_NullIdentityShouldThrowException() {
+        public async Task CreateTag_ShouldFailWhenHistorianIsNotInitialized() {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => {
+                return _fixture.CreateHistorian()
+                               .CreateTag(Identities.GetTestIdentity(),
+                                           new TagSettings() {
+                                               Name = nameof(CreateTag_ShouldFailWhenHistorianIsNotInitialized),
+                                               Description = "This is a test tag",
+                                               Units = "km/h"
+                                           }, CancellationToken.None);
+            }).ConfigureAwait(false);
+        }
+
+
+        [Fact]
+        public async Task CreateTag_ShouldFailWhenIdentityIsNull() {
             await Assert.ThrowsAsync<ArgumentNullException>(() => {
                 return _fixture.Historian
                                .CreateTag(null,
                                            new TagSettings() {
-                                               Name = nameof(CreateTag_ShouldReturnNewTag),
+                                               Name = nameof(CreateTag_ShouldFailWhenIdentityIsNull),
                                                Description = "This is a test tag",
                                                Units = "km/h"
                                            }, CancellationToken.None);
-            });
+            }).ConfigureAwait(false);
         }
 
 
