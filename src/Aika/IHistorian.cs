@@ -12,7 +12,7 @@ namespace Aika {
     /// <summary>
     /// Describes a back-end data historian for Aika.
     /// </summary>
-    public interface IHistorian {
+    public interface IHistorian : IDisposable {
 
         #region [ Fields / Properties ]
 

@@ -9,11 +9,11 @@ namespace Aika.Tests
 {
     public class InMemoryHistorianTestFixture : IAsyncLifetime {
 
-        internal AikaHistorian Historian { get; }
+        internal AikaHistorian DefaultHistorian { get; }
 
 
         public InMemoryHistorianTestFixture() {
-            Historian = CreateHistorian();
+            DefaultHistorian = CreateHistorian();
         }
 
 
@@ -25,11 +25,12 @@ namespace Aika.Tests
 
 
         public virtual async Task InitializeAsync() {
-            await Historian.Init(CancellationToken.None).ConfigureAwait(false);
+            await DefaultHistorian.Init(CancellationToken.None).ConfigureAwait(false);
         }
 
 
         public virtual Task DisposeAsync() {
+            DefaultHistorian.Dispose();
             return Task.CompletedTask;
         }
 

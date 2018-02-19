@@ -1941,5 +1941,20 @@ namespace Aika.Elasticsearch {
 
         #endregion
 
+        #region [ Disposable ]
+
+        /// <summary>
+        /// Releases managed resources.
+        /// </summary>
+        /// <param name="disposing">Flags if the historian is being disposed or finalized.</param>
+        protected override void Dispose(bool disposing) {
+            if (disposing) {
+                _archiveWriter.Dispose();
+                _snapshotWriter.Dispose();
+            }
+        }
+
+        #endregion
+
     }
 }

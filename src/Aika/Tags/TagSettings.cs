@@ -31,7 +31,7 @@ namespace Aika.Tags {
         public TagDataType DataType { get; set; }
 
         /// <summary>
-        /// Gets or sets the name of the <see cref="Aika.StateSet"/> that the tag will use, if the 
+        /// Gets or sets the name of the <see cref="Aika.StateSets.StateSet"/> that the tag will use, if the 
         /// <see cref="DataType"/> is <see cref="TagDataType.State"/>.
         /// </summary>
         public string StateSet { get; set; }

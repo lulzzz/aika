@@ -20,7 +20,7 @@ namespace Aika.Tests {
 
         [Fact]
         public async Task FindTags_ShouldReturnZeroTags() {
-            var tags = await _fixture.Historian.FindTags(Identities.GetTestIdentity(),
+            var tags = await _fixture.DefaultHistorian.FindTags(Identities.GetTestIdentity(),
                                                 new TagDefinitionFilter() {
                                                     FilterClauses = new[] {
                                                         new TagDefinitionFilterClause() {
@@ -38,7 +38,7 @@ namespace Aika.Tests {
         [InlineData("*fir*t*", "First_Test_Tag")]
         [InlineData("*se*ond*", "Second_Test_Tag")]
         public async Task FindTags_ShouldFindTagsByNameFilter(string filter, string expectedResult) {
-            var tags = await _fixture.Historian.FindTags(Identities.GetTestIdentity(),
+            var tags = await _fixture.DefaultHistorian.FindTags(Identities.GetTestIdentity(),
                                                 new TagDefinitionFilter() {
                                                     FilterClauses = new[] {
                                                         new TagDefinitionFilterClause() {
@@ -57,7 +57,7 @@ namespace Aika.Tests {
         [InlineData("*fi*t*", "First_Test_Tag")]
         [InlineData("*seco*d*", "Second_Test_Tag")]
         public async Task FindTags_ShouldFindTagsByDescriptionFilter(string filter, string expectedResult) {
-            var tags = await _fixture.Historian.FindTags(Identities.GetTestIdentity(),
+            var tags = await _fixture.DefaultHistorian.FindTags(Identities.GetTestIdentity(),
                                                 new TagDefinitionFilter() {
                                                     FilterClauses = new[] {
                                                         new TagDefinitionFilterClause() {
@@ -76,7 +76,7 @@ namespace Aika.Tests {
         [InlineData("*Km*h", "First_Test_Tag")]
         [InlineData("*De*C", "Second_Test_Tag")]
         public async Task FindTags_ShouldFindTagsByUnitFilter(string filter, string expectedResult) {
-            var tags = await _fixture.Historian.FindTags(Identities.GetTestIdentity(),
+            var tags = await _fixture.DefaultHistorian.FindTags(Identities.GetTestIdentity(),
                                                 new TagDefinitionFilter() {
                                                     FilterClauses = new[] {
                                                         new TagDefinitionFilterClause() {
@@ -111,7 +111,7 @@ namespace Aika.Tests {
         [Fact]
         public async Task FindTags_ShouldFailWhenIdentityIsNull() {
             await Assert.ThrowsAsync<ArgumentNullException>(() => {
-                return _fixture.Historian.FindTags(null,
+                return _fixture.DefaultHistorian.FindTags(null,
                                            new TagDefinitionFilter() {
                                                FilterClauses = new[] {
                                                    new TagDefinitionFilterClause() {
@@ -127,7 +127,7 @@ namespace Aika.Tests {
         [Fact]
         public async Task FindTags_ShouldFailWhenFilterIsNull() {
             await Assert.ThrowsAsync<ArgumentNullException>(() => {
-                return _fixture.Historian.FindTags(Identities.GetTestIdentity(),
+                return _fixture.DefaultHistorian.FindTags(Identities.GetTestIdentity(),
                                            null,
                                            CancellationToken.None);
             }).ConfigureAwait(false);
@@ -136,14 +136,14 @@ namespace Aika.Tests {
 
         [Fact]
         public async Task GetTags_ShouldReturnTagsByName() {
-            var tags = await _fixture.Historian.GetTags(Identities.GetTestIdentity(), new[] { "First_Test_Tag", "Second_Test_Tag" }, CancellationToken.None).ConfigureAwait(false);
+            var tags = await _fixture.DefaultHistorian.GetTags(Identities.GetTestIdentity(), new[] { "First_Test_Tag", "Second_Test_Tag" }, CancellationToken.None).ConfigureAwait(false);
             Assert.Equal(2, tags.Count);
         }
 
 
         [Fact]
         public async Task GetTags_ShouldReturnTagsById() {
-            var tags = await _fixture.Historian.GetTags(Identities.GetTestIdentity(), _fixture.TagMap.Keys, CancellationToken.None).ConfigureAwait(false);
+            var tags = await _fixture.DefaultHistorian.GetTags(Identities.GetTestIdentity(), _fixture.TagMap.Keys, CancellationToken.None).ConfigureAwait(false);
             Assert.Equal(2, tags.Count);
         }
 
@@ -160,7 +160,7 @@ namespace Aika.Tests {
         [Fact]
         public async Task GetTags_ShouldFailWhenIdentityIsNull() {
             await Assert.ThrowsAsync<ArgumentNullException>(() => {
-                return _fixture.Historian.GetTags(null, new[] { "First_Test_Tag", "Second_Test_Tag" }, CancellationToken.None);
+                return _fixture.DefaultHistorian.GetTags(null, new[] { "First_Test_Tag", "Second_Test_Tag" }, CancellationToken.None);
             }).ConfigureAwait(false);
         }
 
@@ -168,7 +168,7 @@ namespace Aika.Tests {
         [Fact]
         public async Task GetTags_ShouldFailWhenListIsNull() {
             await Assert.ThrowsAsync<ArgumentNullException>(() => {
-                return _fixture.Historian.GetTags(Identities.GetTestIdentity(), null, CancellationToken.None);
+                return _fixture.DefaultHistorian.GetTags(Identities.GetTestIdentity(), null, CancellationToken.None);
             }).ConfigureAwait(false);
         }
 
@@ -176,7 +176,7 @@ namespace Aika.Tests {
         [Fact]
         public async Task GetTags_ShouldFailWhenListIsEmpty() {
             await Assert.ThrowsAsync<ArgumentException>(() => {
-                return _fixture.Historian.GetTags(Identities.GetTestIdentity(), new string[0], CancellationToken.None);
+                return _fixture.DefaultHistorian.GetTags(Identities.GetTestIdentity(), new string[0], CancellationToken.None);
             }).ConfigureAwait(false);
         }
 
@@ -184,14 +184,14 @@ namespace Aika.Tests {
         [Fact]
         public async Task GetTags_ShouldFailWhenListContainsOnlyBlankValues() {
             await Assert.ThrowsAsync<ArgumentException>(() => {
-                return _fixture.Historian.GetTags(Identities.GetTestIdentity(), new[] { "", " ", "   " }, CancellationToken.None);
+                return _fixture.DefaultHistorian.GetTags(Identities.GetTestIdentity(), new[] { "", " ", "   " }, CancellationToken.None);
             }).ConfigureAwait(false);
         }
 
 
         [Fact]
         public async Task GetTags_ShouldNotReturnDuplicates() {
-            var tags = await _fixture.Historian.GetTags(Identities.GetTestIdentity(), new[] { "First_Test_Tag", "First_Test_Tag" }, CancellationToken.None).ConfigureAwait(false);
+            var tags = await _fixture.DefaultHistorian.GetTags(Identities.GetTestIdentity(), new[] { "First_Test_Tag", "First_Test_Tag" }, CancellationToken.None).ConfigureAwait(false);
             Assert.Single(tags);
         }
 
@@ -208,7 +208,7 @@ namespace Aika.Tests {
 
             TagDefinition t;
 
-            t = await Historian.CreateTag(Identities.GetTestIdentity(),
+            t = await DefaultHistorian.CreateTag(Identities.GetTestIdentity(),
                                        new TagSettings() {
                                            Name = "First_Test_Tag",
                                            Description = "This is the first test tag",
@@ -217,7 +217,7 @@ namespace Aika.Tests {
 
             TagMap[t.Id] = t;
 
-            t = await Historian.CreateTag(Identities.GetTestIdentity(),
+            t = await DefaultHistorian.CreateTag(Identities.GetTestIdentity(),
                                        new TagSettings() {
                                            Name = "Second_Test_Tag",
                                            Description = "This is the second test tag",

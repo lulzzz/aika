@@ -15,7 +15,7 @@ namespace Aika {
     /// <summary>
     /// Base class that <see cref="IHistorian"/> implementations must inherit from.
     /// </summary>
-    public abstract class HistorianBase: IHistorian{
+    public abstract class HistorianBase : IHistorian{
 
         #region [ Fields / Properties ]
 
@@ -686,6 +686,47 @@ namespace Aika {
         /// authorization issues should throw a <see cref="System.Security.SecurityException"/>.
         /// </remarks>
         protected abstract Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken);
+
+        #endregion
+
+        #region [ Disposable ]
+
+        /// <summary>
+        /// Flags if the object has been disposed.
+        /// </summary>
+        private bool _isDisposed;
+
+
+        /// <summary>
+        /// Releases managed and unmanaged resources.
+        /// </summary>
+        /// <param name="disposing">
+        ///   <see langword="true"/> if the object is being disposed or <see langword="false"/> if the 
+        ///   object is being finalized.
+        /// </param>
+        protected abstract void Dispose(bool disposing);
+
+
+        /// <summary>
+        /// Releases managed and unmanaged resources.
+        /// </summary>
+        public void Dispose() {
+            if (_isDisposed) {
+                return;
+            }
+
+            Dispose(true);
+            GC.SuppressFinalize(this);
+            _isDisposed = true;
+        }
+
+
+        /// <summary>
+        /// Class finalizer.
+        /// </summary>
+        ~HistorianBase() {
+            Dispose(false);
+        }
 
         #endregion
 

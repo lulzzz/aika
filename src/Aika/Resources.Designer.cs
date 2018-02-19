@@ -214,6 +214,15 @@ namespace Aika {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to You must specify a tag name..
+        /// </summary>
+        internal static string Error_TagNameIsRequired {
+            get {
+                return ResourceManager.GetString("Error_TagNameIsRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The specified tag was not found..
         /// </summary>
         internal static string Error_TagNotFound {

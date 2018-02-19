@@ -313,5 +313,24 @@ namespace Aika.Historians {
             var result = _stateSets.TryRemove(name, out var _);
             return Task.FromResult(result);
         }
+
+
+        #region [ Disposable ]
+
+        /// <summary>
+        /// Releases managed resources.
+        /// </summary>
+        /// <param name="disposing">Flags if the historian is being disposed or finalized.</param>
+        protected override void Dispose(bool disposing) {
+            if (disposing) {
+                _tags.Clear();
+                _archive.Clear();
+                _archiveCandidates.Clear();
+                _stateSets.Clear();
+            }
+        }
+
+        #endregion
+
     }
 }

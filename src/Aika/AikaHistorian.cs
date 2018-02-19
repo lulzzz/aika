@@ -16,7 +16,7 @@ namespace Aika {
     /// <summary>
     /// Aika historian class.
     /// </summary>
-    public sealed class AikaHistorian {
+    public sealed class AikaHistorian : IDisposable {
 
         /// <summary>
         /// Logging.
@@ -51,6 +51,11 @@ namespace Aika {
         private bool _isInitializing;
 
         /// <summary>
+        /// Flags if the object has been disposed.
+        /// </summary>
+        private bool _isDisposed;
+
+        /// <summary>
         /// Gets the UTC startup time for the <see cref="AikaHistorian"/>.
         /// </summary>
         public DateTime UtcStartupTime { get; } = DateTime.UtcNow;
@@ -76,7 +81,7 @@ namespace Aika {
         /// A task that will initialize the historian.
         /// </returns>
         public async Task Init(CancellationToken cancellationToken) {
-            if (_isInitialized || _isInitializing) {
+            if (_isInitialized || _isInitializing || _isDisposed) {
                 return;
             }
 
@@ -125,9 +130,13 @@ namespace Aika {
 
 
         /// <summary>
-        /// Throws an <see cref="InvalidOperationException"/> if the underlying historian is not ready yet.
+        /// Throws an <see cref="InvalidOperationException"/> if the underlying historian is not ready 
+        /// yet or an <see cref="ObjectDisposedException"/> if the object has already been disposed.
         /// </summary>
         private void ThrowIfNotReady() {
+            if (_isDisposed) {
+                throw new ObjectDisposedException(GetType().FullName);
+            }
             if (!_isInitialized || !_historian.IsInitialized) {
                 if (_isInitializing) {
                     throw new InvalidOperationException(Resources.Error_HistorianStillInitializing);
@@ -150,6 +159,7 @@ namespace Aika {
         /// A task that will return matching tag definitions.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="filter"/> is <see langword="null"/>.</exception>
         public async Task<IEnumerable<TagDefinition>> FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
@@ -213,6 +223,7 @@ namespace Aika {
         /// A task that will return the tag definitions.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="tagIdsOrNames"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="tagIdsOrNames"/> does not contain any non-null-or-empty entries.</exception>
@@ -247,6 +258,7 @@ namespace Aika {
         /// for these functions if they are not supported natively by the underlying <see cref="IHistorian"/>.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         public async Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
             ThrowIfNotReady();
             var nativeFunctions = await GetAvailableNativeDataQueryFunctions(cancellationToken).ConfigureAwait(false);
@@ -271,6 +283,7 @@ namespace Aika {
         /// A task that returns a map from tag name to tag values.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="tagNames"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="tagNames"/> does not contain any non-null-or-empty entries.</exception>
@@ -327,6 +340,27 @@ namespace Aika {
         }
 
 
+        /// <summary>
+        /// Performs a request for trend-friendly tag data.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagNames">The names of the tags to query.</param>
+        /// <param name="utcStartTime">The UTC start time for the query.</param>
+        /// <param name="utcEndTime">The UTC end time for the query.</param>
+        /// <param name="intervals">
+        ///   The number of buckets to divide the query time range into.  The historian's plot 
+        ///   implementation will identify relevant samples in each bucket.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that returns a map from tag name to tag values.
+        /// </returns>
+        /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="tagNames"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="tagNames"/> does not contain any non-null-or-empty entries.</exception>
+        /// <exception cref="ArgumentException"><paramref name="utcStartTime"/> is greater than <paramref name="utcEndTime"/>.</exception>
         public async Task<IDictionary<string, TagValueCollection>> ReadPlotData(ClaimsPrincipal identity, IEnumerable<string> tagNames, DateTime utcStartTime, DateTime utcEndTime, int intervals, CancellationToken cancellationToken) {
             ThrowIfNotReady();
 
@@ -584,6 +618,7 @@ namespace Aika {
         /// A task that will return a map from tag name to tag values.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="tagNames"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="tagNames"/> does not contain any non-null-or-empty entries.</exception>
@@ -620,6 +655,7 @@ namespace Aika {
         /// A task that will return a map from tag name to tag values.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="tagNames"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="tagNames"/> does not contain any non-null-or-empty entries.</exception>
@@ -646,6 +682,7 @@ namespace Aika {
         /// A task that will return a map from tag name to tag values.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="tagNames"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="tagNames"/> does not contain any non-null-or-empty entries.</exception>
@@ -703,6 +740,7 @@ namespace Aika {
         /// changes as they occur.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         public SnapshotSubscription CreateSnapshotSubscription(ClaimsPrincipal identity) {
             ThrowIfNotReady();
@@ -728,6 +766,7 @@ namespace Aika {
         /// The results of the insert, indexed by the keys used in <paramref name="values"/>.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="values"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="values"/> does not contain any entries.</exception>
@@ -810,6 +849,7 @@ namespace Aika {
         /// The results of the write, indexed by tag name.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="values"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="values"/> does not contain any entries.</exception>
@@ -964,8 +1004,10 @@ namespace Aika {
         /// A task that will return the new tag definition.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="settings"/> does not define a <see cref="TagSettings.Name"/>.</exception>
         public async Task<TagDefinition> CreateTag(ClaimsPrincipal identity, TagSettings settings, CancellationToken cancellationToken) {
             ThrowIfNotReady();
 
@@ -975,6 +1017,10 @@ namespace Aika {
 
             if (settings == null) {
                 throw new ArgumentNullException(nameof(settings));
+            }
+
+            if (String.IsNullOrWhiteSpace(settings.Name)) {
+                throw new ArgumentException(Resources.Error_TagNameIsRequired, nameof(settings));
             }
 
             settings = new TagSettings(settings);
@@ -1009,6 +1055,7 @@ namespace Aika {
         /// A task that will return the updated tag definition.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="settings"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="tagId"/> is <see langword="null"/> or white space.</exception>
@@ -1053,26 +1100,27 @@ namespace Aika {
         /// Deletes a tag definition.
         /// </summary>
         /// <param name="identity">The identity of the caller.</param>
-        /// <param name="tagIdOrName">The ID or name of the tag to delete.</param>
+        /// <param name="tagId">The ID of the tag to delete.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
         /// A task that returns a flag indicating if the delete was successful.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException"><paramref name="tagIdOrName"/> is <see langword="null"/> or white space.</exception>
-        public async Task<bool> DeleteTag(ClaimsPrincipal identity, string tagIdOrName, CancellationToken cancellationToken) {
+        /// <exception cref="ArgumentException"><paramref name="tagId"/> is <see langword="null"/> or white space.</exception>
+        public async Task<bool> DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken) {
             ThrowIfNotReady();
 
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
 
-            if (String.IsNullOrWhiteSpace(tagIdOrName)) {
-                throw new ArgumentException(Resources.Error_TagIdOrNameIsRequired, nameof(tagIdOrName));
+            if (String.IsNullOrWhiteSpace(tagId)) {
+                throw new ArgumentException(Resources.Error_TagIdIsRequired, nameof(tagId));
             }
 
-            return await _historian.DeleteTag(identity, tagIdOrName, cancellationToken).ConfigureAwait(false);
+            return await _historian.DeleteTag(identity, tagId, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -1086,6 +1134,7 @@ namespace Aika {
         /// A collection of matching tag state sets.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="filter"/> is <see langword="null"/>.</exception>
         public async Task<IEnumerable<StateSet>> GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {
@@ -1113,6 +1162,7 @@ namespace Aika {
         /// A task that will return the matching state set.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="name"/> is <see langword="null"/> or white space.</exception>
         public async Task<StateSet> GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
@@ -1139,6 +1189,7 @@ namespace Aika {
         /// A task that will return the new state set.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException">The <see cref="StateSetSettings.Name"/> in <paramref name="settings"/> is <see langword="null"/> or white space.</exception>
         /// <exception cref="ArgumentException">A state set with the same name already exists.</exception>
@@ -1180,6 +1231,7 @@ namespace Aika {
         /// A task that will return the updated state set.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="name"/> is <see langword="null"/> or white space.</exception>
         /// <exception cref="ArgumentException"><paramref name="name"/> not a known state set.</exception>
@@ -1220,6 +1272,7 @@ namespace Aika {
         /// A task that returns a flag indicating if the state set was deleted.
         /// </returns>
         /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException"><paramref name="name"/> is <see langword="null"/> or white space.</exception>
         public async Task<bool> DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
@@ -1234,6 +1287,22 @@ namespace Aika {
             }
 
             return await _historian.DeleteStateSet(identity, name, cancellationToken).ConfigureAwait(false);
+        }
+
+        #endregion
+
+        #region [ Disposable ]
+
+        /// <summary>
+        /// Disposes of the underlying historian.
+        /// </summary>
+        public void Dispose() {
+            if (_isDisposed) {
+                return;
+            }
+
+            _isDisposed = true;
+            _historian.Dispose();
         }
 
         #endregion
