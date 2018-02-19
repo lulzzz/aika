@@ -99,7 +99,10 @@ namespace Aika.Tags {
         /// Gets the instantaneous snapshot value of the tag.
         /// </summary>
         public TagValue SnapshotValue {
-            get { return _snapshotValue; }
+            get {
+                _historian.ThrowIfDisposed();
+                return _snapshotValue;
+            }
         }
 
         /// <summary>
@@ -157,6 +160,7 @@ namespace Aika.Tags {
         /// <exception cref="ValidationException"><paramref name="settings"/> is not valid.</exception>
         protected TagDefinition(HistorianBase historian, string id, TagSettings settings, TagMetadata metadata, TagSecurity security, InitialTagValues initialTagValues, IEnumerable<TagChangeHistoryEntry> changeHistory) {
             _historian = historian ?? throw new ArgumentNullException(nameof(historian));
+            _historian.ThrowIfDisposed();
             _logger = _historian.LoggerFactory?.CreateLogger<TagDefinition>();
 
             if (settings == null) {
@@ -292,6 +296,7 @@ namespace Aika.Tags {
         /// A task that will return the state set object.
         /// </returns>
         private async Task<StateSet> GetStateSet(ClaimsPrincipal identity, CancellationToken cancellationToken) {
+            _historian.ThrowIfDisposed();
             if (DataType != TagDataType.State) {
                 return null;
             }
@@ -312,6 +317,7 @@ namespace Aika.Tags {
         /// An <see cref="IDisposable"/> that represents the subscription.  Dispose the object to unsubscribe.
         /// </returns>
         internal IDisposable CreateSnapshotSubscription(Action<TagValue> callback) {
+            _historian.ThrowIfDisposed();
             return new SnapshotValueSubscription(this, callback);
         }
 
@@ -331,6 +337,7 @@ namespace Aika.Tags {
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         public async Task<WriteTagValuesResult> WriteSnapshotValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
+            _historian.ThrowIfDisposed();
             var stateSet = await GetStateSet(identity, cancellationToken).ConfigureAwait(false);
 
             var currentSnapshot = SnapshotValue;
@@ -426,6 +433,7 @@ namespace Aika.Tags {
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         public async Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
+            _historian.ThrowIfDisposed();
             return await InsertArchiveValuesInternal(identity, values, null, true, cancellationToken).ConfigureAwait(false);
         }
 
@@ -461,6 +469,7 @@ namespace Aika.Tags {
         /// <param name="value">The updated value.</param>
         /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
         protected void UpdateSnapshotValue(TagValue value) {
+            _historian.ThrowIfDisposed();
             _snapshotValue = value ?? throw new ArgumentNullException(nameof(value));
             DataFilter.ValueReceived(value);
             _historian.TaskRunner.RunBackgroundTask(ct => SaveSnapshotValue(value, ct));
@@ -494,6 +503,7 @@ namespace Aika.Tags {
         /// </returns>
         /// <exception cref="ArgumentNullException"><paramref name="update"/> is <see langword="null"/>.</exception>
         public virtual TagChangeHistoryEntry Update(TagSettings update, ClaimsPrincipal modifier, string description) {
+            _historian.ThrowIfDisposed();
             if (update == null) {
                 throw new ArgumentNullException(nameof(update));
             }

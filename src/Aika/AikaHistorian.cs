@@ -29,16 +29,9 @@ namespace Aika {
         private readonly ILogger _logger;
 
         /// <summary>
-        /// The back-end historian instance.
-        /// </summary>
-        private readonly IHistorian _historian;
-
-        /// <summary>
         /// Gets the back-end historian instance.
         /// </summary>
-        public IHistorian Historian {
-            get { return _historian; }
-        }
+        public IHistorian Historian { get; }
 
         /// <summary>
         /// Flags if <see cref="Init(CancellationToken)"/> has been successfully called.
@@ -67,7 +60,7 @@ namespace Aika {
         /// <param name="historian">The <see cref="IHistorian"/> implementation to delegate queries to.</param>
         /// <param name="loggerFactory">The <see cref="ILoggerFactory"/> to use.</param>
         public AikaHistorian(IHistorian historian, ILoggerFactory loggerFactory) {
-            _historian = historian ?? throw new ArgumentNullException(nameof(historian));
+            Historian = historian ?? throw new ArgumentNullException(nameof(historian));
             _loggerFactory = loggerFactory;
             _logger = _loggerFactory?.CreateLogger<AikaHistorian>();
         }
@@ -137,7 +130,7 @@ namespace Aika {
             if (_isDisposed) {
                 throw new ObjectDisposedException(GetType().FullName);
             }
-            if (!_isInitialized || !_historian.IsInitialized) {
+            if (!_isInitialized || !Historian.IsInitialized) {
                 if (_isInitializing) {
                     throw new InvalidOperationException(Resources.Error_HistorianStillInitializing);
                 }
@@ -171,7 +164,7 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(filter));
             }
 
-            var result = await RunWithImmediateCancellation(_historian.FindTags(identity, filter, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var result = await RunWithImmediateCancellation(Historian.FindTags(identity, filter, cancellationToken), cancellationToken).ConfigureAwait(false);
             return result;
         }
 
@@ -208,7 +201,7 @@ namespace Aika {
                 return new Dictionary<string, TagDefinition>();
             }
 
-            var result = await RunWithImmediateCancellation(_historian.GetTags(identity, authorisedTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var result = await RunWithImmediateCancellation(Historian.GetTags(identity, authorisedTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
             return result;
         }
 
@@ -243,7 +236,7 @@ namespace Aika {
         /// for these functions if they are not supported natively by the underlying <see cref="IHistorian"/>.
         /// </returns>
         private async Task<IEnumerable<DataQueryFunction>> GetAvailableNativeDataQueryFunctions(CancellationToken cancellationToken) {
-            return await RunWithImmediateCancellation(_historian.GetAvailableDataQueryFunctions(cancellationToken), cancellationToken).ConfigureAwait(false);
+            return await RunWithImmediateCancellation(Historian.GetAvailableDataQueryFunctions(cancellationToken), cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -308,7 +301,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagNames));
             }
 
-            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
+            var tags = await Historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
             var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
                                      .ToDictionary(x => x.Key, x => x.Value);
 
@@ -319,7 +312,7 @@ namespace Aika {
                 dataQueryResult = new Dictionary<TagDefinition, TagValueCollection>();
             }
             else {
-                dataQueryResult = await RunWithImmediateCancellation(_historian.ReadRawData(identity, authorizedTags.Values, utcStartTime, utcEndTime, pointCount < 0 ? 0 : pointCount, cancellationToken), cancellationToken).ConfigureAwait(false);
+                dataQueryResult = await RunWithImmediateCancellation(Historian.ReadRawData(identity, authorizedTags.Values, utcStartTime, utcEndTime, pointCount < 0 ? 0 : pointCount, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
 
             foreach (var item in tags) {
@@ -385,7 +378,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagNames));
             }
 
-            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
+            var tags = await Historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
             var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
                                      .ToDictionary(x => x.Key, x => x.Value);
 
@@ -396,7 +389,7 @@ namespace Aika {
                 dataQueryResult = new Dictionary<TagDefinition, TagValueCollection>();
             }
             else {
-                dataQueryResult = await RunWithImmediateCancellation(_historian.ReadPlotData(identity, authorizedTags.Values, utcStartTime, utcEndTime, intervals, cancellationToken), cancellationToken).ConfigureAwait(false);
+                dataQueryResult = await RunWithImmediateCancellation(Historian.ReadPlotData(identity, authorizedTags.Values, utcStartTime, utcEndTime, intervals, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
 
             foreach (var item in tags) {
@@ -465,7 +458,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_StartTimeCannotBeLaterThanEndTime, nameof(utcStartTime));
             }
 
-            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
+            var tags = await Historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
             var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
                                      .ToDictionary(x => x.Key, x => x.Value);
 
@@ -487,7 +480,7 @@ namespace Aika {
 
                     // Check which of the tags actually support the data function being used.
 
-                    var canUseFunc = await _historian.IsDataQueryFunctionSupported(identity, authorizedTags.Values, func.Name, cancellationToken).ConfigureAwait(false);
+                    var canUseFunc = await Historian.IsDataQueryFunctionSupported(identity, authorizedTags.Values, func.Name, cancellationToken).ConfigureAwait(false);
 
                     var supportedTags = new List<TagDefinition>();
                     foreach (var item in canUseFunc) {
@@ -503,8 +496,8 @@ namespace Aika {
                         // a single ReadProcessedData call.
 
                         query = pointCount.HasValue
-                            ? _historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
-                            : _historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
+                            ? Historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
+                            : Historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
                     }
                     else {
                         // Support for the data function is mixed.  We'll request processed data for 
@@ -514,13 +507,13 @@ namespace Aika {
                             IDictionary<TagDefinition, TagValueCollection> res = new Dictionary<TagDefinition, TagValueCollection>();
 
                             var supportedQuery = pointCount.HasValue
-                                ? _historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
-                                : _historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
+                                ? Historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, pointCount.Value, cancellationToken)
+                                : Historian.ReadProcessedData(identity, supportedTags, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken);
 
                             var pc = pointCount.HasValue
                                 ? pointCount.Value
                                 : (int) Math.Ceiling((utcEndTime - utcStartTime).TotalMilliseconds / sampleInterval.TotalMilliseconds);
-                            var unsupportedQuery = _historian.ReadRawData(identity, unsupportedTags, utcStartTime, utcEndTime, pc, cancellationToken);
+                            var unsupportedQuery = Historian.ReadRawData(identity, unsupportedTags, utcStartTime, utcEndTime, pc, cancellationToken);
 
                             await Task.WhenAll(supportedQuery, unsupportedQuery).ConfigureAwait(false);
                             cancellationToken.ThrowIfCancellationRequested();
@@ -551,7 +544,7 @@ namespace Aika {
                     }
                     var queryStartTime = utcStartTime.Subtract(sampleInterval);
 
-                    query = _historian.ReadRawData(identity, authorizedTags.Values, queryStartTime, utcEndTime, 0, cancellationToken).ContinueWith(t => {
+                    query = Historian.ReadRawData(identity, authorizedTags.Values, queryStartTime, utcEndTime, 0, cancellationToken).ContinueWith(t => {
                         var aggregator = new AggregationUtility(_loggerFactory);
                         // We'll hint that INTERP data can be interpolated on a chart, but 
                         // other functions should use trailing-edge transitions.
@@ -702,7 +695,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagNames));
             }
 
-            var tags = await _historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
+            var tags = await Historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
             var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
                                      .ToDictionary(x => x.Key, x => x.Value);
 
@@ -713,7 +706,7 @@ namespace Aika {
                 dataQueryResult = new Dictionary<TagDefinition, TagValue>();
             }
             else {
-                dataQueryResult = await RunWithImmediateCancellation(_historian.ReadSnapshotData(identity, authorizedTags.Values, cancellationToken), cancellationToken).ConfigureAwait(false);
+                dataQueryResult = await RunWithImmediateCancellation(Historian.ReadSnapshotData(identity, authorizedTags.Values, cancellationToken), cancellationToken).ConfigureAwait(false);
             }
 
             foreach (var item in tags) {
@@ -1039,7 +1032,7 @@ namespace Aika {
                 settings.CompressionFilterSettings = GetDefaultCompressionFilterSettings(settings.DataType);
             }
 
-            return await _historian.CreateTag(identity, settings, cancellationToken).ConfigureAwait(false);
+            return await Historian.CreateTag(identity, settings, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -1092,7 +1085,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_TagNotFound, nameof(tagId));
             }
 
-            return await _historian.UpdateTag(identity, tag, settings, description, cancellationToken).ConfigureAwait(false);
+            return await Historian.UpdateTag(identity, tag, settings, description, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -1120,7 +1113,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_TagIdIsRequired, nameof(tagId));
             }
 
-            return await _historian.DeleteTag(identity, tagId, cancellationToken).ConfigureAwait(false);
+            return await Historian.DeleteTag(identity, tagId, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -1148,7 +1141,7 @@ namespace Aika {
                 throw new ArgumentNullException(nameof(filter));
             }
 
-            return await _historian.GetStateSets(identity, filter, cancellationToken).ConfigureAwait(false);
+            return await Historian.GetStateSets(identity, filter, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -1175,7 +1168,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_StateSetNameIsRequired, nameof(name));
             }
 
-            return await _historian.GetStateSet(identity, name, cancellationToken).ConfigureAwait(false);
+            return await Historian.GetStateSet(identity, name, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -1211,12 +1204,12 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_AtLeastOneStateIsRequired, nameof(settings.States));
             }
 
-            var existing = await _historian.GetStateSet(identity, settings.Name, cancellationToken).ConfigureAwait(false);
+            var existing = await Historian.GetStateSet(identity, settings.Name, cancellationToken).ConfigureAwait(false);
             if (existing != null) {
                 throw new ArgumentException(Resources.Error_StateSetAlreadyExists, nameof(settings));
             }
 
-            return await _historian.CreateStateSet(identity, new StateSetSettings() { Name = settings.Name, Description = settings.Description, States = nonNullStates }, cancellationToken).ConfigureAwait(false);
+            return await Historian.CreateStateSet(identity, new StateSetSettings() { Name = settings.Name, Description = settings.Description, States = nonNullStates }, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -1253,12 +1246,12 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_AtLeastOneStateIsRequired, nameof(settings));
             }
 
-            var existing = await _historian.GetStateSet(identity, name, cancellationToken).ConfigureAwait(false);
+            var existing = await Historian.GetStateSet(identity, name, cancellationToken).ConfigureAwait(false);
             if (existing == null) {
                 throw new ArgumentException(Resources.Error_StateSetDoesNotExist, nameof(name));
             }
 
-            return await _historian.UpdateStateSet(identity, name, new StateSetSettings() { Description = settings.Description, States = nonNullStates }, cancellationToken).ConfigureAwait(false);
+            return await Historian.UpdateStateSet(identity, name, new StateSetSettings() { Description = settings.Description, States = nonNullStates }, cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -1286,7 +1279,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_StateSetNameIsRequired, nameof(name));
             }
 
-            return await _historian.DeleteStateSet(identity, name, cancellationToken).ConfigureAwait(false);
+            return await Historian.DeleteStateSet(identity, name, cancellationToken).ConfigureAwait(false);
         }
 
         #endregion
@@ -1302,7 +1295,7 @@ namespace Aika {
             }
 
             _isDisposed = true;
-            _historian.Dispose();
+            Historian.Dispose();
         }
 
         #endregion

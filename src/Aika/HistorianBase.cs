@@ -98,7 +98,7 @@ namespace Aika {
         /// A task that will initialize the historian.
         /// </returns>
         async Task IHistorian.Init(CancellationToken cancellationToken) {
-            if (_isInitialized) {
+            if (_isInitialized || _isDisposed) {
                 return;
             }
 
@@ -137,6 +137,7 @@ namespace Aika {
         /// A collection of matching tags.
         /// </returns>
         async Task<IEnumerable<TagDefinition>> IHistorian.FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await FindTags(identity, filter, cancellationToken).ConfigureAwait(false);
         }
 
@@ -163,6 +164,7 @@ namespace Aika {
         /// The definitions of the requested tags, indexed by the entry in <paramref name="tagIdsOrNames"/>.
         /// </returns>
         async Task<IDictionary<string, TagDefinition>> IHistorian.GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await GetTags(identity, tagIdsOrNames, cancellationToken).ConfigureAwait(false);
         }
 
@@ -189,6 +191,7 @@ namespace Aika {
         /// The state sets defined by the historian, indexed by set name.
         /// </returns>
         async Task<IEnumerable<StateSet>> IHistorian.GetStateSets(ClaimsPrincipal identity, StateSetFilter filter, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await GetStateSets(identity, filter, cancellationToken).ConfigureAwait(false);
         }
 
@@ -215,6 +218,7 @@ namespace Aika {
         /// The corresponding <see cref="StateSet"/>.
         /// </returns>
         async Task<StateSet> IHistorian.GetStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await GetStateSet(identity, name, cancellationToken).ConfigureAwait(false);
         }
 
@@ -242,6 +246,7 @@ namespace Aika {
         /// A collection of data query functions.  Common functions are defined in the <see cref="DataQueryFunction"/> class.
         /// </returns>
         async Task<IEnumerable<DataQueryFunction>> IHistorian.GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await GetAvailableDataQueryFunctions(cancellationToken).ConfigureAwait(false);
         }
 
@@ -268,6 +273,7 @@ namespace Aika {
         /// <paramref name="dataFunction"/>.
         /// </returns>
         async Task<IDictionary<TagDefinition, bool>> IHistorian.IsDataQueryFunctionSupported(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await IsDataQueryFunctionSupported(identity, tags, dataFunction, cancellationToken).ConfigureAwait(false);
         }
 
@@ -304,6 +310,7 @@ namespace Aika {
         /// A dictionary of snapshot values, indexed by tag.
         /// </returns>
         async Task<IDictionary<TagDefinition, TagValue>> IHistorian.ReadSnapshotData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await ReadSnapshotData(identity, tags, cancellationToken).ConfigureAwait(false);
         }
 
@@ -344,6 +351,7 @@ namespace Aika {
         /// A dictionary of historical data, indexed by tag.
         /// </returns>
         async Task<IDictionary<TagDefinition, TagValueCollection>> IHistorian.ReadRawData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await ReadRawData(identity, tags, utcStartTime, utcEndTime, pointCount, cancellationToken).ConfigureAwait(false);
         }
 
@@ -385,6 +393,7 @@ namespace Aika {
         /// A dictionary of historical data, indexed by tag.
         /// </returns>
         async Task<IDictionary<TagDefinition, TagValueCollection>> IHistorian.ReadPlotData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, int intervals, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await ReadPlotData(identity, tags, utcStartTime, utcEndTime, intervals, cancellationToken).ConfigureAwait(false);
         }
 
@@ -444,6 +453,7 @@ namespace Aika {
         /// </returns>
         /// <seealso cref="DataQueryFunction"/>
         async Task<IDictionary<TagDefinition, TagValueCollection>> IHistorian.ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await ReadProcessedData(identity, tags, dataFunction, utcStartTime, utcEndTime, sampleInterval, cancellationToken).ConfigureAwait(false);
         }
 
@@ -483,6 +493,7 @@ namespace Aika {
         /// </returns>
         /// <seealso cref="DataQueryFunction"/>
         async Task<IDictionary<TagDefinition, TagValueCollection>> IHistorian.ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await ReadProcessedData(identity, tags, dataFunction, utcStartTime, utcEndTime, pointCount, cancellationToken).ConfigureAwait(false);
         }
 
@@ -520,6 +531,7 @@ namespace Aika {
         /// The new tag definition.
         /// </returns>
         async Task<TagDefinition> IHistorian.CreateTag(ClaimsPrincipal identity, TagSettings tag, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await CreateTag(identity, tag, cancellationToken).ConfigureAwait(false);
         }
 
@@ -548,6 +560,7 @@ namespace Aika {
         /// The updated tag definition.
         /// </returns>
         async Task<TagDefinition> IHistorian.UpdateTag(ClaimsPrincipal identity, TagDefinition tag, TagSettings update, string description, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             if (tag.Historian != this) {
                 throw new ArgumentException(Resources.Error_CannotOperateOnTagsOwnedByAnotherHistorian, nameof(tag));
             }
@@ -582,6 +595,7 @@ namespace Aika {
         /// A flag that indicates if the tag was deleted.
         /// </returns>
         async Task<bool> IHistorian.DeleteTag(ClaimsPrincipal identity, string tagId, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await DeleteTag(identity, tagId, cancellationToken).ConfigureAwait(false);
         }
 
@@ -613,6 +627,7 @@ namespace Aika {
         /// A new <see cref="StateSet"/>.
         /// </returns>
         async Task<StateSet> IHistorian.CreateStateSet(ClaimsPrincipal identity, StateSetSettings settings, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await CreateStateSet(identity, settings, cancellationToken).ConfigureAwait(false);
         }
 
@@ -640,6 +655,7 @@ namespace Aika {
         /// The updated <see cref="StateSet"/>.
         /// </returns>
         async Task<StateSet> IHistorian.UpdateStateSet(ClaimsPrincipal identity, string name, StateSetSettings settings, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await UpdateStateSet(identity, name, settings, cancellationToken).ConfigureAwait(false);
         }
 
@@ -667,6 +683,7 @@ namespace Aika {
         /// A flag that indicates if the state set was deleted.
         /// </returns>
         async Task<bool> IHistorian.DeleteStateSet(ClaimsPrincipal identity, string name, CancellationToken cancellationToken) {
+            ThrowIfDisposed();
             return await DeleteStateSet(identity, name, cancellationToken).ConfigureAwait(false);
         }
 
@@ -726,6 +743,17 @@ namespace Aika {
         /// </summary>
         ~HistorianBase() {
             Dispose(false);
+        }
+
+
+        /// <summary>
+        /// Throws an <see cref="ObjectDisposedException"/> if the historian has been disposed.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
+        internal void ThrowIfDisposed() {
+            if (_isDisposed) {
+                throw new ObjectDisposedException(GetType().FullName);
+            }
         }
 
         #endregion
