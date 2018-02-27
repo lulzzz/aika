@@ -272,7 +272,7 @@ namespace Aika.Redis {
                     return;
                 }
 
-                var vals = await tag.GetRawValues(utcStartTime, utcEndTime, pointCount, cancellationToken).ConfigureAwait(false);
+                var vals = await tag.GetRawValues(identity, utcStartTime, utcEndTime, pointCount, cancellationToken).ConfigureAwait(false);
                 result[tag] = new TagValueCollection() {
                     VisualizationHint = TagValueCollectionVisualizationHint.TrailingEdge,
                     Values = vals.ToArray()

@@ -96,8 +96,9 @@ namespace Aika {
 
                 _subscriptions[item.Id] = item.CreateSnapshotSubscription(onValueReceived);
 
-                if (item.SnapshotValue != null) {
-                    onValueReceived.Invoke(item.SnapshotValue);
+                var snapshot = item.ReadSnapshotValue(identity);
+                if (snapshot != null) {
+                    onValueReceived.Invoke(snapshot);
                 }
 
                 item.Deleted += UnsubscribeTag;

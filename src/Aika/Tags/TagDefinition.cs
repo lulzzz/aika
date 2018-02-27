@@ -96,16 +96,6 @@ namespace Aika.Tags {
         private TagValue _snapshotValue;
 
         /// <summary>
-        /// Gets the instantaneous snapshot value of the tag.
-        /// </summary>
-        public TagValue SnapshotValue {
-            get {
-                _historian.ThrowIfDisposed();
-                return _snapshotValue;
-            }
-        }
-
-        /// <summary>
         /// Gets the data filter for the tag.
         /// </summary>
         public DataFilter DataFilter { get; }
@@ -224,6 +214,7 @@ namespace Aika.Tags {
         /// A dictionary containing custom properties associated with the tag.
         /// </returns>
         public virtual IDictionary<string, object> GetProperties() {
+            _historian.ThrowIfDisposed();
             return new Dictionary<string, object>();
         }
 
@@ -237,6 +228,7 @@ namespace Aika.Tags {
         /// A flag that specifies if the identity is authorized or not.
         /// </returns>
         public bool IsAuthorized(ClaimsPrincipal identity, params string[] policyNames) {
+            _historian.ThrowIfDisposed();
             if (identity == null) {
                 return true;
             }
@@ -310,6 +302,25 @@ namespace Aika.Tags {
 
 
         /// <summary>
+        /// Gets the instantaneous snapshot value for the tag.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <returns>
+        /// The snapshot tag value.
+        /// </returns>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
+        public TagValue ReadSnapshotValue(ClaimsPrincipal identity) {
+            _historian.ThrowIfDisposed();
+
+            if (!this.CanRead(identity)) {
+                return TagValue.CreateUnauthorizedTagValue(DateTime.MinValue);
+            }
+
+            return _snapshotValue;
+        }
+
+
+        /// <summary>
         /// Creates a new snapshot value subscription.
         /// </summary>
         /// <param name="callback">The callback function to invoke when the value changes.</param>
@@ -338,9 +349,18 @@ namespace Aika.Tags {
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         public async Task<WriteTagValuesResult> WriteSnapshotValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
             _historian.ThrowIfDisposed();
+
+            if (!this.CanWrite(identity)) {
+                return WriteTagValuesResult.CreateUnauthorizedResult();
+            }
+
+            if (!values?.Any() ?? false) {
+                return WriteTagValuesResult.CreateEmptyResult();
+            }
+
             var stateSet = await GetStateSet(identity, cancellationToken).ConfigureAwait(false);
 
-            var currentSnapshot = SnapshotValue;
+            var currentSnapshot = ReadSnapshotValue(identity);
 
             DateTime? earliestSampleTime = null;
             DateTime? latestSampleTime = null;
@@ -434,6 +454,15 @@ namespace Aika.Tags {
         /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
         public async Task<WriteTagValuesResult> InsertArchiveValues(ClaimsPrincipal identity, IEnumerable<TagValue> values, CancellationToken cancellationToken) {
             _historian.ThrowIfDisposed();
+
+            if (!this.CanWrite(identity)) {
+                return WriteTagValuesResult.CreateUnauthorizedResult();
+            }
+
+            if (!values?.Any() ?? false) {
+                return WriteTagValuesResult.CreateEmptyResult();
+            }
+
             return await InsertArchiveValuesInternal(identity, values, null, true, cancellationToken).ConfigureAwait(false);
         }
 

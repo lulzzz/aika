@@ -701,6 +701,7 @@ namespace Aika.Redis {
         /// <summary>
         /// Gets raw data samples from Redis.
         /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
         /// <param name="utcStartTime">The UTC start time for the query.</param>
         /// <param name="utcEndTime">The UTC end time for the query.</param>
         /// <param name="sampleCount">The maximum number of samples to return.</param>
@@ -708,7 +709,7 @@ namespace Aika.Redis {
         /// <returns>
         /// A task that will return the raw tag values.
         /// </returns>
-        internal async Task<IEnumerable<TagValue>> GetRawValues(DateTime utcStartTime, DateTime utcEndTime, int sampleCount, CancellationToken cancellationToken) {
+        internal async Task<IEnumerable<TagValue>> GetRawValues(ClaimsPrincipal identity, DateTime utcStartTime, DateTime utcEndTime, int sampleCount, CancellationToken cancellationToken) {
             var startTimeScore = GetScoreForSampleTime(utcStartTime);
             var endTimeScore = GetScoreForSampleTime(utcEndTime);
             if (endTimeScore < startTimeScore) {
@@ -761,7 +762,7 @@ namespace Aika.Redis {
             var nonArchiveValues = new List<TagValue>();
 
             var archiveCandidate = _archiveCandidateValue;
-            var snapshot = SnapshotValue;
+            var snapshot = ReadSnapshotValue(identity);
 
             if (rawSampleValues.Length < sampleCount && (archiveCandidate?.Value?.UtcSampleTime ?? DateTime.MaxValue) <= utcEndTime) {
                 nonArchiveValues.Add(archiveCandidate.Value);

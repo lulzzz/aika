@@ -173,13 +173,19 @@ namespace Aika {
         /// Gets the specified tag definitions.
         /// </summary>
         /// <param name="identity">The identity of the calling user.</param>
-        /// <param name="tagIdsOrNames">The tags to retrieve.</param>
-        /// <param name="func">A callback function that will ensure that the calling <paramref name="identity"/> has the required permissions for the tags.</param>
+        /// <param name="tagIdsOrNames">The IDs or names of the tags to retrieve.</param>
         /// <param name="cancellationToken">The cancellation token for the request.</param>
         /// <returns>
-        /// A task that will return the tag definitions, indexed by the entry in <paramref name="tagIdsOrNames"/>.
+        /// A task that will return the tag definitions.
         /// </returns>
-        private async Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, Func<ClaimsPrincipal, IEnumerable<string>, CancellationToken, Task<IDictionary<string, bool>>> func, CancellationToken cancellationToken) {
+        /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
+        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="tagIdsOrNames"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="tagIdsOrNames"/> does not contain any non-null-or-empty entries.</exception>
+        public async Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
+            ThrowIfNotReady();
+
             if (identity == null) {
                 throw new ArgumentNullException(nameof(identity));
             }
@@ -193,36 +199,7 @@ namespace Aika {
                 throw new ArgumentException(Resources.Error_AtLeastOneTagNameRequired, nameof(tagIdsOrNames));
             }
 
-            var authorisedTagNames = func == null 
-                ? distinctTagNames 
-                : (await RunWithImmediateCancellation(func(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false)).Where(x => x.Value).Select(x => x.Key).ToArray();
-
-            if (authorisedTagNames.Length == 0) {
-                return new Dictionary<string, TagDefinition>();
-            }
-
-            var result = await RunWithImmediateCancellation(Historian.GetTags(identity, authorisedTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
-            return result;
-        }
-
-
-        /// <summary>
-        /// Gets the specified tag definitions.
-        /// </summary>
-        /// <param name="identity">The identity of the calling user.</param>
-        /// <param name="tagIdsOrNames">The IDs or names of the tags to retrieve.</param>
-        /// <param name="cancellationToken">The cancellation token for the request.</param>
-        /// <returns>
-        /// A task that will return the tag definitions.
-        /// </returns>
-        /// <exception cref="InvalidOperationException">The historian has not been initialized.</exception>
-        /// <exception cref="ObjectDisposedException">The historian has been disposed.</exception>
-        /// <exception cref="ArgumentNullException"><paramref name="identity"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentNullException"><paramref name="tagIdsOrNames"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException"><paramref name="tagIdsOrNames"/> does not contain any non-null-or-empty entries.</exception>
-        public Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagIdsOrNames, CancellationToken cancellationToken) {
-            ThrowIfNotReady();
-            return GetTags(identity, tagIdsOrNames, null, cancellationToken);
+            return await RunWithImmediateCancellation(Historian.GetTags(identity, distinctTagNames, cancellationToken), cancellationToken).ConfigureAwait(false);
         }
 
 
@@ -302,7 +279,7 @@ namespace Aika {
             }
 
             var tags = await Historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
-            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
+            var authorizedTags = tags.Where(x => x.Value.CanRead(identity))
                                      .ToDictionary(x => x.Key, x => x.Value);
 
             var result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
@@ -379,7 +356,7 @@ namespace Aika {
             }
 
             var tags = await Historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
-            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
+            var authorizedTags = tags.Where(x => x.Value.CanRead(identity))
                                      .ToDictionary(x => x.Key, x => x.Value);
 
             var result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
@@ -459,7 +436,7 @@ namespace Aika {
             }
 
             var tags = await Historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
-            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
+            var authorizedTags = tags.Where(x => x.Value.CanRead(identity))
                                      .ToDictionary(x => x.Key, x => x.Value);
 
             var result = new Dictionary<string, TagValueCollection>(StringComparer.OrdinalIgnoreCase);
@@ -696,7 +673,7 @@ namespace Aika {
             }
 
             var tags = await Historian.GetTags(identity, distinctTagNames, cancellationToken).ConfigureAwait(false);
-            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator))
+            var authorizedTags = tags.Where(x => x.Value.CanRead(identity))
                                      .ToDictionary(x => x.Key, x => x.Value);
 
             var result = new Dictionary<string, TagValue>(StringComparer.OrdinalIgnoreCase);
@@ -781,24 +758,11 @@ namespace Aika {
 
             var result = new ConcurrentDictionary<string, WriteTagValuesResult>(StringComparer.OrdinalIgnoreCase);
 
-            // Get definitions of the tags to write data to, where the caller has permission to write 
-            // to the tag and the values dictionary contains at least one value for the tag.
+            // Get definitions of the tags to write data to, where the values dictionary contains at 
+            // least one value for the tag.
             var tagNames = values.Where(x => x.Value != null && x.Value.Any(v => v != null)).Select(x => x.Key);
 
             var tags = await GetTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
-            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataWrite, Tags.Security.TagSecurityPolicy.Administrator))
-                                     .ToDictionary(x => x.Key, x => x.Value);
-
-            var unauthorizedTags = tags.Where(x => !authorizedTags.ContainsKey(x.Key)).ToArray();
-
-            foreach (var item in unauthorizedTags) {
-                result[item.Key] = WriteTagValuesResult.CreateUnauthorizedResult();
-            }
-
-            if (authorizedTags.Count == 0) {
-                return result;
-            }
-
             var tasks = new List<Task>(values.Count);
 
             foreach (var item in values) {
@@ -864,32 +828,23 @@ namespace Aika {
 
             var result = new ConcurrentDictionary<string, WriteTagValuesResult>(StringComparer.OrdinalIgnoreCase);
 
-            // Get definitions of the tags to write data to, where the caller has permission to write 
-            // to the tag and the values dictionary contains at least one value for the tag.
+            // Get definitions of the tags to write data to, where the values dictionary contains at 
+            // least one value for the tag.
             var tagNames = values.Where(x => x.Value != null && x.Value.Any(v => v != null)).Select(x => x.Key);
 
             var tags = await GetTags(identity, tagNames, cancellationToken).ConfigureAwait(false);
-            var authorizedTags = tags.Where(x => x.Value.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataWrite, Tags.Security.TagSecurityPolicy.Administrator))
-                                     .ToDictionary(x => x.Key, x => x.Value);
-
-            var unauthorizedTags = tags.Where(x => !authorizedTags.ContainsKey(x.Key)).ToArray();
-
-            foreach (var item in unauthorizedTags) {
-                result[item.Key] = WriteTagValuesResult.CreateUnauthorizedResult();
-            }
-
-            if (authorizedTags.Count == 0) {
-                return result;
-            }
-
-            var valuesToForward = new Dictionary<string, IEnumerable<TagValue>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var item in values) {
                 if (!tags.TryGetValue(item.Key, out var tag)) {
                     continue;
                 }
 
-                result[item.Key] = await tag.WriteSnapshotValues(identity, item.Value, cancellationToken).ConfigureAwait(false);
+                try {
+                    result[item.Key] = await tag.WriteSnapshotValues(identity, item.Value, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception e) {
+                    result[item.Key] = new WriteTagValuesResult(false, 0, null, null, new[] { e.Message });
+                }
             }
 
             return result;

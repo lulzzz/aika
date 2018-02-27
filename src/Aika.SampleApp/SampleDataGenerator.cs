@@ -133,6 +133,7 @@ namespace Aika.SampleApp {
                 return 50f * (Math.Sin(2 * Math.PI * (1 / period) * (time % period)));
             };
 
+            TagValue snapshot;
             var sinusoid = tags.Values.FirstOrDefault(x => x.Name.Equals("Sinusoid", StringComparison.OrdinalIgnoreCase));
             if (sinusoid == null) {
                 sinusoid = await _historian.CreateTag(identity,
@@ -155,8 +156,8 @@ namespace Aika.SampleApp {
                                                 },
                                                 cancellationToken).ConfigureAwait(false);
             }
-            else if (sinusoid.SnapshotValue != null) {
-                start = sinusoid.SnapshotValue.UtcSampleTime.Add(TimeSpan.FromSeconds(5));
+            else if ((snapshot = sinusoid.ReadSnapshotValue(identity))!= null) {
+                start = snapshot.UtcSampleTime.Add(TimeSpan.FromSeconds(5));
             }
 
             var runningState = tags.Values.FirstOrDefault(x => x.Name.Equals("Running_State", StringComparison.OrdinalIgnoreCase));
@@ -212,7 +213,7 @@ namespace Aika.SampleApp {
                                                     {
                                                          runningState.Name,
                                                          new [] {
-                                                             new TagValue(runningState.SnapshotValue?.UtcSampleTime.AddSeconds(1) ?? DateTime.UtcNow.AddSeconds(-1), runningStateStopped.Value, runningStateStopped.Name, TagValueQuality.Good, null),
+                                                             new TagValue(runningState.ReadSnapshotValue(identity)?.UtcSampleTime.AddSeconds(1) ?? DateTime.UtcNow.AddSeconds(-1), runningStateStopped.Value, runningStateStopped.Name, TagValueQuality.Good, null),
                                                              new TagValue(DateTime.UtcNow, runningStateRunning.Value, runningStateRunning.Name, TagValueQuality.Good, null)
                                                          }
                                                      }

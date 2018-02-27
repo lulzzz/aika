@@ -20,7 +20,7 @@ namespace Aika.Tests
         internal AikaHistorian CreateHistorian() {
             // TODO: include logging.
             var taskRunner = new DefaultTaskRunner(null);
-            return new AikaHistorian(new Aika.Historians.InMemoryHistorian(taskRunner, null), null);
+            return new AikaHistorian(new Aika.Implementations.InMemory.InMemoryHistorian(taskRunner, null), null);
         }
 
 

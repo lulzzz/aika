@@ -317,7 +317,7 @@ namespace Aika {
 
         /// <summary>
         /// Retrieves snapshot data from the historian.  The default implementation simply returns 
-        /// the <see cref="TagDefinition.SnapshotValue"/> property for each tag; override this 
+        /// the <see cref="TagDefinition.ReadSnapshotValue(ClaimsPrincipal)"/> property for each tag; override this 
         /// method in your back-end if you need to query an external service to retrieve snapshot 
         /// values.
         /// </summary>
@@ -328,7 +328,7 @@ namespace Aika {
         /// A dictionary of snapshot values, indexed by tag.
         /// </returns>
         protected virtual Task<IDictionary<TagDefinition, TagValue>> ReadSnapshotData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, CancellationToken cancellationToken) {
-            var result = tags.Where(x => x.Historian == this).ToDictionary(x => x, x => x.SnapshotValue);
+            var result = tags.Where(x => x.Historian == this).ToDictionary(x => x, x => x.ReadSnapshotValue(identity));
             return Task.FromResult<IDictionary<TagDefinition, TagValue>>(result);
         }
 

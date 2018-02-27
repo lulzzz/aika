@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading;
 using Aika.Tags;
 
-namespace Aika.Historians {
+namespace Aika.Implementations.InMemory {
 
     /// <summary>
     /// Holds raw tag data for a tag in an <see cref="InMemoryHistorian"/>.

@@ -146,5 +146,39 @@ namespace Aika.Tags {
             return true;
         }
 
+
+        /// <summary>
+        /// Tests if the specified identity is authorized to read tag data.
+        /// </summary>
+        /// <param name="tag">The tag.</param>
+        /// <param name="identity">The identity.</param>
+        /// <returns>
+        /// <see langword="true"/> if the caller is authorized, otherwise <see langword="false"/>.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        public static bool CanRead(this TagDefinition tag, ClaimsPrincipal identity) {
+            if (tag == null) {
+                throw new ArgumentNullException(nameof(tag));
+            }
+            return tag.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataRead, Tags.Security.TagSecurityPolicy.Administrator);
+        }
+
+
+        /// <summary>
+        /// Tests if the specified identity is authorized to write tag data.
+        /// </summary>
+        /// <param name="tag">The tag.</param>
+        /// <param name="identity">The identity.</param>
+        /// <returns>
+        /// <see langword="true"/> if the caller is authorized, otherwise <see langword="false"/>.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tag"/> is <see langword="null"/>.</exception>
+        public static bool CanWrite(this TagDefinition tag, ClaimsPrincipal identity) {
+            if (tag == null) {
+                throw new ArgumentNullException(nameof(tag));
+            }
+            return tag.IsAuthorized(identity, Tags.Security.TagSecurityPolicy.DataWrite, Tags.Security.TagSecurityPolicy.Administrator);
+        }
+
     }
 }

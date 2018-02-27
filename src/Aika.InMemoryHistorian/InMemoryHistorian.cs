@@ -11,36 +11,75 @@ using Aika.StateSets;
 using Aika.Tags;
 using Microsoft.Extensions.Logging;
 
-namespace Aika.Historians {
+namespace Aika.Implementations.InMemory {
     /// <summary>
     /// <see cref="IHistorian"/> implementation that uses an in-memory data store.
     /// </summary>
     public sealed class InMemoryHistorian : HistorianBase {
 
+        /// <summary>
+        /// Holds tag definitions, indexed by ID.
+        /// </summary>
         private readonly ConcurrentDictionary<string, InMemoryTagDefinition> _tags = new ConcurrentDictionary<string, InMemoryTagDefinition>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Holds state set definitions.
+        /// </summary>
         private readonly ConcurrentDictionary<string, StateSet> _stateSets = new ConcurrentDictionary<string, StateSet>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Holds archived tag values.
+        /// </summary>
         private readonly ConcurrentDictionary<string, RawDataSet> _archive = new ConcurrentDictionary<string, RawDataSet>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Holds archive candidate values.
+        /// </summary>
         private readonly ConcurrentDictionary<string, ArchiveCandidateValue> _archiveCandidates = new ConcurrentDictionary<string, ArchiveCandidateValue>(StringComparer.OrdinalIgnoreCase);
 
-        private const int MaxRawSampleCount = 5000;
+        /// <summary>
+        /// The mamximum number of raw samples that can be requested in a single query.
+        /// </summary>
+        public const int MaxRawSampleCount = 5000;
 
 
+        /// <summary>
+        /// Gets the historian description.
+        /// </summary>
         public override string Description {
             get { return "In-memory data store."; }
         }
 
 
+        /// <summary>
+        /// Creates a new <see cref="InMemoryHistorian"/> object.
+        /// </summary>
+        /// <param name="taskRunner">The task runner to use.</param>
+        /// <param name="loggerFactory">The logger factory to use.</param>
         public InMemoryHistorian(ITaskRunner taskRunner, ILoggerFactory loggerFactory) : base(taskRunner, loggerFactory) { }
 
 
+        /// <summary>
+        /// Initialzizes the historian.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A task that will initialize the historian.
+        /// </returns>
         protected override Task Init(CancellationToken cancellationToken) {
             return Task.CompletedTask;
         }
 
 
+        /// <summary>
+        /// Performs a tag search.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="filter">The tag search filter.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A page of search results.
+        /// </returns>
         protected override Task<IEnumerable<TagDefinition>> FindTags(ClaimsPrincipal identity, TagDefinitionFilter filter, CancellationToken cancellationToken) {
             IEnumerable<TagDefinition> allTags = _tags.Values;
             var result = filter.FilterType == TagDefinitionFilterJoinType.And
@@ -84,9 +123,19 @@ namespace Aika.Historians {
         }
 
 
-        protected override Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagNames, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Gets tag definitions by ID or name.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tagNamesOrIds">The IDs or names of the tags to retrieve.</param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A dictionary that maps from the tag name or ID specified in <paramref name="tagNamesOrIds"/> 
+        /// to the matching tag definition.
+        /// </returns>
+        protected override Task<IDictionary<string, TagDefinition>> GetTags(ClaimsPrincipal identity, IEnumerable<string> tagNamesOrIds, CancellationToken cancellationToken) {
             var result = new Dictionary<string, TagDefinition>(StringComparer.OrdinalIgnoreCase);
-            foreach (var item in tagNames) {
+            foreach (var item in tagNamesOrIds) {
                 if (String.IsNullOrWhiteSpace(item)) {
                     continue;
                 }
@@ -105,12 +154,35 @@ namespace Aika.Historians {
         }
 
 
+        /// <summary>
+        /// Gets the data query functions supported by the historian.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// The supported data query functions.  This is always an empty collection; aggregation is 
+        /// delegated to the built-in <see cref="AikaHistorian"/> implementation.
+        /// </returns>
         protected override Task<IEnumerable<DataQueryFunction>> GetAvailableDataQueryFunctions(CancellationToken cancellationToken) {
             return Task.FromResult<IEnumerable<DataQueryFunction>>(new DataQueryFunction[0]);
         }
 
         
-        private Task<IDictionary<TagDefinition, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, int? pointCount, CancellationToken cancellationToken) {
+        /// <summary>
+        /// Reads raw data for the specified tags.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tags">The tags to read from.</param>
+        /// <param name="utcStartTime">The UTC start time for the request.</param>
+        /// <param name="utcEndTime">The UTC end time for the request.</param>
+        /// <param name="pointCount">
+        ///   The number of raw samples to request per tag.  If not specified or less than zero, 
+        ///   <see cref="MaxRawSampleCount"/> will be used.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A dictionary of query results, indexed by tag.
+        /// </returns>
+        private Task<IDictionary<TagDefinition, TagValueCollection>> ReadRawDataInternal(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, int? pointCount, CancellationToken cancellationToken) {
             var result = new Dictionary<TagDefinition, TagValueCollection>();
 
             foreach (var tag in tags) {
@@ -130,7 +202,7 @@ namespace Aika.Historians {
                     if (_archiveCandidates.TryGetValue(tag.Id, out var candidate) && candidate?.Value != null) {
                         nonArchiveValues.Add(candidate.Value);
                     }
-                    var snapshot = tag.SnapshotValue;
+                    var snapshot = tag.ReadSnapshotValue(identity);
                     if (snapshot != null) {
                         nonArchiveValues.Add(snapshot);
                     }
@@ -151,21 +223,67 @@ namespace Aika.Historians {
         }
 
 
+        /// <summary>
+        /// Reads raw data for the specified tags.
+        /// </summary>
+        /// <param name="identity">The identity of the caller.</param>
+        /// <param name="tags">The tags to read from.</param>
+        /// <param name="utcStartTime">The UTC start time for the request.</param>
+        /// <param name="utcEndTime">The UTC end time for the request.</param>
+        /// <param name="pointCount">
+        ///   The number of raw samples to request per tag.  If less than zero or greater than 
+        ///   <see cref="MaxRawSampleCount"/>, <see cref="MaxRawSampleCount"/> will be used instead.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token for the request.</param>
+        /// <returns>
+        /// A dictionary of query results, indexed by tag.
+        /// </returns>
         protected override Task<IDictionary<TagDefinition, TagValueCollection>> ReadRawData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
-            return ReadRawData(identity, tags, utcStartTime, utcEndTime, TimeSpan.Zero, pointCount, cancellationToken);
+            return ReadRawDataInternal(identity, tags, utcStartTime, utcEndTime, pointCount, cancellationToken);
         }
 
 
+        /// <summary>
+        /// This method is not implemented; processed data queries are handled directly by the <see cref="AikaHistorian"/>.
+        /// </summary>
+        /// <param name="identity"></param>
+        /// <param name="tags"></param>
+        /// <param name="dataFunction"></param>
+        /// <param name="utcStartTime"></param>
+        /// <param name="utcEndTime"></param>
+        /// <param name="sampleInterval"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException">This method is not implemented; processed data queries are handled directly by the <see cref="AikaHistorian"/>.</exception>
         protected override Task<IDictionary<TagDefinition, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, TimeSpan sampleInterval, CancellationToken cancellationToken) {
             throw new NotSupportedException();
         }
 
 
+        /// <summary>
+        /// This method is not implemented; processed data queries are handled directly by the <see cref="AikaHistorian"/>.
+        /// </summary>
+        /// <param name="identity"></param>
+        /// <param name="tags"></param>
+        /// <param name="dataFunction"></param>
+        /// <param name="utcStartTime"></param>
+        /// <param name="utcEndTime"></param>
+        /// <param name="pointCount"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException">This method is not implemented; processed data queries are handled directly by the <see cref="AikaHistorian"/>.</exception>
         protected override Task<IDictionary<TagDefinition, TagValueCollection>> ReadProcessedData(ClaimsPrincipal identity, IEnumerable<TagDefinition> tags, string dataFunction, DateTime utcStartTime, DateTime utcEndTime, int pointCount, CancellationToken cancellationToken) {
             throw new NotSupportedException();
         }
 
 
+        /// <summary>
+        /// Gets the last-archived value for the specified tag ID.
+        /// </summary>
+        /// <param name="tagId">The tag ID.</param>
+        /// <returns>
+        /// The last-archived <see cref="TagValue"/>.
+        /// </returns>
         internal TagValue GetLastArchivedValue(string tagId) {
             if (!_archive.TryGetValue(tagId, out var rawData)) {
                 return null;
@@ -181,16 +299,24 @@ namespace Aika.Historians {
         }
 
 
-        internal void SaveSnapshotValue(string tagId, TagValue value) {
-            // Do nothing; this is held in the tag itself.
-        }
-
-
+        /// <summary>
+        /// Saves an updated <see cref="ArchiveCandidateValue"/> for a tag.
+        /// </summary>
+        /// <param name="tagId">The tag ID.</param>
+        /// <param name="value">The archive candidate value.</param>
         internal void SaveArchiveCandidateValue(string tagId, ArchiveCandidateValue value) {
             _archiveCandidates[tagId] = value;
         }
 
 
+        /// <summary>
+        /// Writes values into the archive.
+        /// </summary>
+        /// <param name="tagId">The tag ID.</param>
+        /// <param name="values">The values to write.</param>
+        /// <returns>
+        /// The results of the write.
+        /// </returns>
         internal WriteTagValuesResult InsertArchiveValues(string tagId, IEnumerable<TagValue> values) {
             var rawData = _archive.GetOrAdd(tagId, x => new RawDataSet());
             var tag = _tags[tagId];
